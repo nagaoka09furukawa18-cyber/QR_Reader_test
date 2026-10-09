@@ -91,6 +91,7 @@
             this.logs.push({
                 type: `【${stepKey}】`,
                 step: stepLabel,
+                tehaiNo: state.tehai || "", // 読み取った手配No
                 startTime: formatTime(startTimeObj),
                 endTime: formatTime(endTimeObj),
                 durationMs: perfDuration,
@@ -172,10 +173,11 @@
 
     // ── STEP3 & STEP4 ──
     async function onScanSuccess(no) {
+        state = { tehai: String(no).trim(), proc: '', staff: '', mac: '', mode: '' };
+        
         AppLogger.end("STEP3", "スキャン開始できるようになって実際にスキャンできるまで");
         AppLogger.start("STEP4");
 
-        state = { tehai: String(no).trim(), proc: '', staff: '', mac: '', mode: '' };
         document.getElementById('tehaiDisplay').innerHTML = `手配No：<span>${state.tehai}</span>`;
         document.getElementById('button-area').innerHTML = "";
         showScreen('screenDetail');
