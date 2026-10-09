@@ -269,8 +269,11 @@
     }
 
     // ── STEP7: データ保存 ──
+    // ── STEP7: データ保存 ──
     async function finalizeAction() {
+        // 1. 計測開始
         AppLogger.start("STEP7");
+        
         document.getElementById('loading-text').innerText = "データ保存中...";
         document.getElementById('loading-overlay').style.display = 'flex';
         const devName = masters.device ? masters.device.name : "不明";
@@ -283,14 +286,21 @@
                     `&type=${state.mode === 'END' ? 'end' : 'start'}` +
                     `&deviceId=${deviceId}`;
                     
+        // 2. GASとの通信
         const res = await callGas(url);
         
+        // 3. タイマー終了＆ログ記録
         AppLogger.end("STEP7", "データ保存開始から成功しましたまで");
-        await AppLogger.flush();
 
+        // 5. ローダーを非表示にする
         document.getElementById('loading-overlay').style.display = 'none';
+
+        // 6. アラート（ダイアログ）を開く・表示する
         alert(res.success ? "成功しました" : "失敗: " + res.message);
         resetToMain();
+
+        // 4. 【6の後で実行】ログ送信の追加通信を後ろに回す
+        await AppLogger.flush();
     }
 
     function refreshSlots(k) { ['proc', 'staff', 'mac'].forEach(id => { document.getElementById('val-'+id).innerText = state[id] || "---"; document.getElementById('slot-'+id).className = 'select-slot ' + (id === k ? 'active-slot' : (!state[id] ? 'disabled' : '')); }); }
