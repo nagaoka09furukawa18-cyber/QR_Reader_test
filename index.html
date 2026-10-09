@@ -62,22 +62,25 @@
     let deviceId = localStorage.getItem('test_deviceId') || 'TEST-ID-' + Math.random().toString(36).substring(2, 8).toUpperCase();
     localStorage.setItem('test_deviceId', deviceId);
 
+    // ── 詳細7ステップ対応ロガー ──
     const AppLogger = {
         logs: [],
-        screenTimer: null,
+        timers: {},
 
-        startNetwork() { return performance.now(); },
-        endNetwork(name, startTime) {
-            const duration = Math.round(performance.now() - startTime);
-            this.logs.push({ type: "【システム通信】", step: name, durationMs: duration, timestamp: new Date().toISOString(), deviceId: deviceId });
+        start(stepName) {
+            this.timers[stepName] = performance.now();
         },
-
-        startScreen(screenName) { this.screenTimer = { name: screenName, start: performance.now() }; },
-        endScreen() {
-            if (!this.screenTimer) return;
-            const duration = Math.round(performance.now() - this.screenTimer.start);
-            this.logs.push({ type: "【作業者操作】", step: `${this.screenTimer.name}での操作時間`, durationMs: duration, timestamp: new Date().toISOString(), deviceId: deviceId });
-            this.screenTimer = null;
+        end(stepName, category = "【操作・処理】") {
+            if (!this.timers[stepName]) return;
+            const duration = Math.round(performance.now() - this.timers[stepName]);
+            this.logs.push({
+                type: category,
+                step: stepName,
+                durationMs: duration,
+                timestamp: new Date().toISOString(),
+                deviceId: deviceId
+            });
+            delete this.timers[stepName];
         },
 
         async flush() {
@@ -93,20 +96,35 @@
     };
 
     async function timedFetch(url, label) {
-        const t = AppLogger.startNetwork();
+        const t = performance.now();
         try {
             const resp = await fetch(url);
             const data = await resp.json();
-            AppLogger.endNetwork(label, t);
+            const duration = Math.round(performance.now() - t);
+            AppLogger.logs.push({
+                type: "【システム通信】",
+                step: label,
+                durationMs: duration,
+                timestamp: new Date().toISOString(),
+                deviceId: deviceId
+            });
             return data;
         } catch(e) {
-            AppLogger.endNetwork(label + " (エラー)", t);
+            AppLogger.logs.push({
+                type: "【システム通信エラー】",
+                step: label,
+                durationMs: Math.round(performance.now() - t),
+                timestamp: new Date().toISOString(),
+                deviceId: deviceId
+            });
             return { success: false, message: "通信エラー" };
         }
     }
 
+    // STEP1: アプリ立ち上げ開始
+    AppLogger.start("STEP1: アプリ立ち上げから操作可能になるまで");
+
     async function init() {
-        AppLogger.startScreen("初期ロード・メイン画面");
         document.getElementById('loading-text').innerText = "データ読み込み中...";
         document.getElementById('loading-overlay').style.display = 'flex';
         
@@ -118,11 +136,47 @@
             document.getElementById('btnStartScan').style.display = "block"; 
         }
         showScreen('screenMain');
-        AppLogger.endScreen();
+        
+        // STEP1 終了
+        AppLogger.end("STEP1: アプリ立ち上げから操作可能になるまで", "【STEP1】アプリ起動");
     }
 
+    let html5QrCode = null;
+
+    // STEP2: QRスキャン開始ボタンを押してからスキャン開始できるまで
+    async function startScan() {
+        AppLogger.start("STEP2: QRスキャン開始ボタンを押してスキャン開始できるまで");
+        showScreen('screenScanner');
+        
+        try {
+            html5QrCode = new Html5Qrcode("reader");
+            await html5QrCode.start(
+                { facingMode: "environment" }, 
+                { fps: 10, qrbox: 250 }, 
+                (txt) => {
+                    if (html5QrCode && html5QrCode.isScanning) {
+                        html5QrCode.stop().then(() => {
+                            onScanSuccess(txt);
+                        }).catch(() => { onScanSuccess(txt); });
+                    }
+                }
+            );
+            // STEP2 終了（カメラ起動完了）
+            AppLogger.end("STEP2: QRスキャン開始ボタンを押してスキャン開始できるまで", "【STEP2】カメラ起動");
+        } catch (err) {
+            alert("カメラの起動に失敗しました: " + err);
+            resetToMain();
+        }
+    }
+
+    // STEP3: スキャン開始できるようになってから実際にスキャンできるまで ＆ STEP4: 確認時間
     async function onScanSuccess(no) {
-        AppLogger.startScreen("QRスキャン後ステータス確認");
+        // STEP3 終了（QR読み取り成功）
+        AppLogger.end("STEP3: スキャン開始できるようになって実際にスキャンできるまで", "【STEP3】QR読取");
+
+        // STEP4 開始（作業開始/終了確認時間）
+        AppLogger.start("STEP4: 作業開始/終了確認時間");
+
         state = { tehai: String(no).trim(), proc: '', staff: '', mac: '', mode: '' };
         document.getElementById('tehaiDisplay').innerHTML = `手配No：<span>${state.tehai}</span>`;
         document.getElementById('button-area').innerHTML = "";
@@ -134,7 +188,9 @@
         const res = await timedFetch(`${GAS_URL}?action=checkStatus&tehaiNo=${encodeURIComponent(state.tehai)}&processList=${encodeURIComponent(procListParam)}`, "checkStatus");
         
         document.getElementById('loading-overlay').style.display = 'none';
-        AppLogger.endScreen();
+
+        // STEP4 終了
+        AppLogger.end("STEP4: 作業開始/終了確認時間", "【STEP4】ステータス確認");
 
         if (res.mode === "END") {
             state.mode = "END";
@@ -152,8 +208,9 @@
         }
     }
 
+    // STEP5: 工程を選択開始し、作業者、装置名が選択されるまでの時間
     function renderStartProcUI() {
-        AppLogger.startScreen("工程選択");
+        AppLogger.start("STEP5: 工程・作業者・装置選択時間");
         state.proc = ''; refreshSlots('proc');
         const list = (masters.device?.config || "").split(',').map(p => p.trim()).filter(Boolean);
         if (list.length === 1) { selectProc(list[0]); }
@@ -163,14 +220,12 @@
         }
     }
     function selectProc(p) { 
-        AppLogger.endScreen();
         state.proc = p; 
         refreshSlots('proc'); 
         renderStartStaffUI(); 
     }
 
     function renderStartStaffUI() {
-        AppLogger.startScreen("作業者選択");
         refreshSlots('staff');
         const list = masters.staffs.filter(r => String(r[0]).trim() === state.proc).map(r => String(r[1]).split(',')).flat().filter(Boolean);
         if (list.length === 1) { selectStaff(list[0]); }
@@ -181,37 +236,44 @@
         }
     }
     function selectStaff(s) { 
-        AppLogger.endScreen();
         state.staff = s; 
         refreshSlots('staff'); 
         renderStartMacUI(); 
     }
 
     function renderStartMacUI() {
-        AppLogger.startScreen("装置選択");
         refreshSlots('mac');
         const list = [...new Set(masters.machines.filter(r => String(r[0]).trim() === state.proc && String(r[1]).split(',').includes(state.staff)).map(r => String(r[2]).split(',')).flat())].filter(Boolean);
         document.getElementById('button-area').innerHTML = "";
         document.getElementById('button-title').innerText = "装置選択";
         list.forEach(m => { const b = document.createElement('button'); b.className = "btn-blue"; b.innerText = m; b.onclick = () => { 
-            AppLogger.endScreen();
             state.mac = m; 
             refreshSlots('mac'); 
+            
+            // STEP5 終了（すべての選択完了）
+            AppLogger.end("STEP5: 工程・作業者・装置選択時間", "【STEP5】選択完了");
+
             renderFinalConfirm("開始準備完了"); 
         }; document.getElementById('button-area').appendChild(b); });
     }
 
+    // STEP6: 開始準備完了から「実行する」を押すまでの時間
     function renderFinalConfirm(msg) {
-        AppLogger.startScreen("最終確認・実行待ち");
+        AppLogger.start("STEP6: 開始準備完了から実行するを押すまで");
         document.getElementById('button-area').innerHTML = "";
         document.getElementById('button-title').innerText = msg;
         const b = document.createElement('button'); b.className = "btn-main btn-green"; b.innerText = "実行する";
-        b.onclick = finalizeAction;
+        b.onclick = () => {
+            // STEP6 終了
+            AppLogger.end("STEP6: 開始準備完了から実行するを押すまで", "【STEP6】実行ボタン押下");
+            finalizeAction();
+        };
         document.getElementById('button-area').appendChild(b);
     }
 
+    // STEP7: データ保存開始から「成功しました」までの時間
     async function finalizeAction() {
-        AppLogger.endScreen();
+        AppLogger.start("STEP7: データ保存開始から成功しましたまで");
         document.getElementById('loading-text').innerText = "データ保存中...";
         document.getElementById('loading-overlay').style.display = 'flex';
         const devName = masters.device ? masters.device.name : "不明";
@@ -225,6 +287,9 @@
                     `&deviceId=${deviceId}`;
                     
         const res = await timedFetch(url, "executeAction");
+        
+        // パフォーマンスログ送信とSTEP7終了
+        AppLogger.end("STEP7: データ保存開始から成功しましたまで", "【STEP7】データ保存完了");
         await AppLogger.flush();
 
         document.getElementById('loading-overlay').style.display = 'none';
@@ -234,12 +299,11 @@
 
     function refreshSlots(k) { ['proc', 'staff', 'mac'].forEach(id => { document.getElementById('val-'+id).innerText = state[id] || "---"; document.getElementById('slot-'+id).className = 'select-slot ' + (id === k ? 'active-slot' : (!state[id] ? 'disabled' : '')); }); }
     function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-    function resetToMain() { state = { tehai: '', proc: '', staff: '', mac: '', mode: '' }; showScreen('screenMain'); }
-    
-    async function startScan() { 
-        showScreen('screenScanner'); 
-        const s = new Html5Qrcode("reader"); 
-        await s.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (txt) => { s.stop().then(() => onScanSuccess(txt)); }).catch(() => resetToMain()); 
+    function resetToMain() { 
+        state = { tehai: '', proc: '', staff: '', mac: '', mode: '' }; 
+        showScreen('screenMain'); 
+        // 次の動作のためにSTEP2の計測準備（QRスキャンボタン押下待ち）
+        AppLogger.start("STEP2: QRスキャン開始ボタンを押してスキャン開始できるまで");
     }
     
     function authAdmin() { showScreen('screenAuth'); }
