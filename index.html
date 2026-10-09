@@ -62,25 +62,43 @@
     let deviceId = localStorage.getItem('test_deviceId') || 'TEST-ID-' + Math.random().toString(36).substring(2, 8).toUpperCase();
     localStorage.setItem('test_deviceId', deviceId);
 
-    // ── 詳細7ステップ対応ロガー ──
+    function formatTime(dateObj) {
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const d = String(dateObj.getDate()).padStart(2, '0');
+        const h = String(dateObj.getHours()).padStart(2, '0');
+        const min = String(dateObj.getMinutes()).padStart(2, '0');
+        const s = String(dateObj.getSeconds()).padStart(2, '0');
+        const ms = String(dateObj.getMilliseconds()).padStart(3, '0');
+        return `${y}/${m}/${d} ${h}:${min}:${s}.${ms}`;
+    }
+
     const AppLogger = {
         logs: [],
         timers: {},
+        startTimes: {},
 
-        start(stepName) {
-            this.timers[stepName] = performance.now();
+        start(stepKey) {
+            this.timers[stepKey] = performance.now();
+            this.startTimes[stepKey] = new Date();
         },
-        end(stepName, category = "【操作・処理】") {
-            if (!this.timers[stepName]) return;
-            const duration = Math.round(performance.now() - this.timers[stepName]);
+        end(stepKey, stepLabel) {
+            if (!this.timers[stepKey]) return;
+            const perfDuration = Math.round(performance.now() - this.timers[stepKey]);
+            const startTimeObj = this.startTimes[stepKey];
+            const endTimeObj = new Date();
+
             this.logs.push({
-                type: category,
-                step: stepName,
-                durationMs: duration,
-                timestamp: new Date().toISOString(),
+                type: `【${stepKey}】`,
+                step: stepLabel,
+                startTime: formatTime(startTimeObj),
+                endTime: formatTime(endTimeObj),
+                durationMs: perfDuration,
                 deviceId: deviceId
             });
-            delete this.timers[stepName];
+
+            delete this.timers[stepKey];
+            delete this.startTimes[stepKey];
         },
 
         async flush() {
@@ -95,40 +113,23 @@
         }
     };
 
-    async function timedFetch(url, label) {
-        const t = performance.now();
+    async function callGas(url) {
         try {
             const resp = await fetch(url);
-            const data = await resp.json();
-            const duration = Math.round(performance.now() - t);
-            AppLogger.logs.push({
-                type: "【システム通信】",
-                step: label,
-                durationMs: duration,
-                timestamp: new Date().toISOString(),
-                deviceId: deviceId
-            });
-            return data;
+            return await resp.json();
         } catch(e) {
-            AppLogger.logs.push({
-                type: "【システム通信エラー】",
-                step: label,
-                durationMs: Math.round(performance.now() - t),
-                timestamp: new Date().toISOString(),
-                deviceId: deviceId
-            });
             return { success: false, message: "通信エラー" };
         }
     }
 
-    // STEP1: アプリ立ち上げ開始
-    AppLogger.start("STEP1: アプリ立ち上げから操作可能になるまで");
+    // ── STEP1: アプリ立ち上げ開始 ──
+    AppLogger.start("STEP1");
 
     async function init() {
         document.getElementById('loading-text').innerText = "データ読み込み中...";
         document.getElementById('loading-overlay').style.display = 'flex';
         
-        masters = await timedFetch(GAS_URL + "?action=getAllMasters&deviceId=" + deviceId, "getAllMasters");
+        masters = await callGas(GAS_URL + "?action=getAllMasters&deviceId=" + deviceId);
         
         document.getElementById('loading-overlay').style.display = 'none';
         if (masters.device) { 
@@ -137,20 +138,19 @@
         }
         showScreen('screenMain');
         
-        // STEP1 終了
-        AppLogger.end("STEP1: アプリ立ち上げから操作可能になるまで", "【STEP1】アプリ起動");
+        AppLogger.end("STEP1", "アプリ立ち上げから操作可能になるまで");
     }
 
     let html5QrCode = null;
 
-    // STEP2: QRスキャン開始ボタンを押してからスキャン開始できるまで
-    async function startScan() {
-        AppLogger.start("STEP2: QRスキャン開始ボタンを押してスキャン開始できるまで");
+    // ── STEP2: QRスキャン開始ボタン押下 ──
+    function startScan() {
+        AppLogger.start("STEP2");
         showScreen('screenScanner');
         
         try {
             html5QrCode = new Html5Qrcode("reader");
-            await html5QrCode.start(
+            html5QrCode.start(
                 { facingMode: "environment" }, 
                 { fps: 10, qrbox: 250 }, 
                 (txt) => {
@@ -160,22 +160,20 @@
                         }).catch(() => { onScanSuccess(txt); });
                     }
                 }
-            );
-            // STEP2 終了（カメラ起動完了）
-            AppLogger.end("STEP2: QRスキャン開始ボタンを押してスキャン開始できるまで", "【STEP2】カメラ起動");
+            ).then(() => {
+                AppLogger.end("STEP2", "QRスキャン開始ボタンを押してスキャン開始できるまで");
+                AppLogger.start("STEP3");
+            });
         } catch (err) {
             alert("カメラの起動に失敗しました: " + err);
             resetToMain();
         }
     }
 
-    // STEP3: スキャン開始できるようになってから実際にスキャンできるまで ＆ STEP4: 確認時間
+    // ── STEP3 & STEP4 ──
     async function onScanSuccess(no) {
-        // STEP3 終了（QR読み取り成功）
-        AppLogger.end("STEP3: スキャン開始できるようになって実際にスキャンできるまで", "【STEP3】QR読取");
-
-        // STEP4 開始（作業開始/終了確認時間）
-        AppLogger.start("STEP4: 作業開始/終了確認時間");
+        AppLogger.end("STEP3", "スキャン開始できるようになって実際にスキャンできるまで");
+        AppLogger.start("STEP4");
 
         state = { tehai: String(no).trim(), proc: '', staff: '', mac: '', mode: '' };
         document.getElementById('tehaiDisplay').innerHTML = `手配No：<span>${state.tehai}</span>`;
@@ -185,12 +183,11 @@
         document.getElementById('loading-overlay').style.display = 'flex';
         
         const procListParam = masters.device ? masters.device.config : "";
-        const res = await timedFetch(`${GAS_URL}?action=checkStatus&tehaiNo=${encodeURIComponent(state.tehai)}&processList=${encodeURIComponent(procListParam)}`, "checkStatus");
+        const res = await callGas(`${GAS_URL}?action=checkStatus&tehaiNo=${encodeURIComponent(state.tehai)}&processList=${encodeURIComponent(procListParam)}`);
         
         document.getElementById('loading-overlay').style.display = 'none';
 
-        // STEP4 終了
-        AppLogger.end("STEP4: 作業開始/終了確認時間", "【STEP4】ステータス確認");
+        AppLogger.end("STEP4", "作業開始/終了確認時間");
 
         if (res.mode === "END") {
             state.mode = "END";
@@ -208,9 +205,9 @@
         }
     }
 
-    // STEP5: 工程を選択開始し、作業者、装置名が選択されるまでの時間
+    // ── STEP5: 工程・作業者・装置選択 ──
     function renderStartProcUI() {
-        AppLogger.start("STEP5: 工程・作業者・装置選択時間");
+        AppLogger.start("STEP5");
         state.proc = ''; refreshSlots('proc');
         const list = (masters.device?.config || "").split(',').map(p => p.trim()).filter(Boolean);
         if (list.length === 1) { selectProc(list[0]); }
@@ -250,30 +247,28 @@
             state.mac = m; 
             refreshSlots('mac'); 
             
-            // STEP5 終了（すべての選択完了）
-            AppLogger.end("STEP5: 工程・作業者・装置選択時間", "【STEP5】選択完了");
+            AppLogger.end("STEP5", "工程を選択開始し、作業者、装置名が選択された時間");
 
             renderFinalConfirm("開始準備完了"); 
         }; document.getElementById('button-area').appendChild(b); });
     }
 
-    // STEP6: 開始準備完了から「実行する」を押すまでの時間
+    // ── STEP6: 実行ボタン押下待ち ──
     function renderFinalConfirm(msg) {
-        AppLogger.start("STEP6: 開始準備完了から実行するを押すまで");
+        AppLogger.start("STEP6");
         document.getElementById('button-area').innerHTML = "";
         document.getElementById('button-title').innerText = msg;
         const b = document.createElement('button'); b.className = "btn-main btn-green"; b.innerText = "実行する";
         b.onclick = () => {
-            // STEP6 終了
-            AppLogger.end("STEP6: 開始準備完了から実行するを押すまで", "【STEP6】実行ボタン押下");
+            AppLogger.end("STEP6", "開始準備完了から実行するを押すまで");
             finalizeAction();
         };
         document.getElementById('button-area').appendChild(b);
     }
 
-    // STEP7: データ保存開始から「成功しました」までの時間
+    // ── STEP7: データ保存 ──
     async function finalizeAction() {
-        AppLogger.start("STEP7: データ保存開始から成功しましたまで");
+        AppLogger.start("STEP7");
         document.getElementById('loading-text').innerText = "データ保存中...";
         document.getElementById('loading-overlay').style.display = 'flex';
         const devName = masters.device ? masters.device.name : "不明";
@@ -286,10 +281,9 @@
                     `&type=${state.mode === 'END' ? 'end' : 'start'}` +
                     `&deviceId=${deviceId}`;
                     
-        const res = await timedFetch(url, "executeAction");
+        const res = await callGas(url);
         
-        // パフォーマンスログ送信とSTEP7終了
-        AppLogger.end("STEP7: データ保存開始から成功しましたまで", "【STEP7】データ保存完了");
+        AppLogger.end("STEP7", "データ保存開始から成功しましたまで");
         await AppLogger.flush();
 
         document.getElementById('loading-overlay').style.display = 'none';
@@ -302,14 +296,12 @@
     function resetToMain() { 
         state = { tehai: '', proc: '', staff: '', mac: '', mode: '' }; 
         showScreen('screenMain'); 
-        // 次の動作のためにSTEP2の計測準備（QRスキャンボタン押下待ち）
-        AppLogger.start("STEP2: QRスキャン開始ボタンを押してスキャン開始できるまで");
     }
     
     function authAdmin() { showScreen('screenAuth'); }
     
     async function checkPassword() {
-        const res = await timedFetch(GAS_URL + "?action=getAdminPassword", "getAdminPassword");
+        const res = await callGas(GAS_URL + "?action=getAdminPassword");
         if (document.getElementById('adminPwInput').value === String(res.password).trim()) {
             showScreen('screenConfig');
             const cur = (masters.device?.config || "").split(',');
@@ -320,7 +312,7 @@
     
     async function saveConfig() {
         const sel = Array.from(document.querySelectorAll('#configList button')).filter(b => b.className === "btn-blue").map(b => b.innerText).join(',');
-        await timedFetch(`${GAS_URL}?action=saveDeviceConfig&deviceId=${deviceId}&deviceName=${encodeURIComponent(document.getElementById('inputDeviceName').value)}&processList=${encodeURIComponent(sel)}`, "saveConfig");
+        await callGas(`${GAS_URL}?action=saveDeviceConfig&deviceId=${deviceId}&deviceName=${encodeURIComponent(document.getElementById('inputDeviceName').value)}&processList=${encodeURIComponent(sel)}`);
         location.reload();
     }
     
