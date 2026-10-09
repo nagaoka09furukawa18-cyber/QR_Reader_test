@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>加工進捗管理 V3.1 [TEST]</title>
+    <title>加工進捗管理 V3.0 [TEST]</title>
     <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; text-align: center; background: #f4f7f9; padding: 10px; margin: 0; color: #333; }
@@ -55,7 +55,6 @@
     <div id="screenConfig" class="screen"><h3>端末詳細設定</h3><input type="text" id="inputDeviceName" placeholder="端末名"><div id="configList" style="margin:15px 0; text-align:left;"></div><button class="btn-green btn-main" onclick="saveConfig()">設定保存</button></div>
 </div>
 <script>
-    // ★ ここをテスト用GASのデプロイURLに書き換えてください
     const GAS_URL = "https://script.google.com/macros/s/AKfycbwUe_IeJYIBaAfJqa2-KNepwKESmkV--q_ana70xwh_big9OU3PAtkBj1R2dZymkI2E/exec";
 
     let state = { tehai: '', proc: '', staff: '', mac: '', mode: '' };
@@ -63,7 +62,6 @@
     let deviceId = localStorage.getItem('test_deviceId') || 'TEST-ID-' + Math.random().toString(36).substring(2, 8).toUpperCase();
     localStorage.setItem('test_deviceId', deviceId);
 
-    // ── ログ管理オブジェクト（システム遅延 vs 作業者操作時間を切り分け） ──
     const AppLogger = {
         logs: [],
         screenTimer: null,
@@ -74,7 +72,7 @@
             this.logs.push({ type: "【システム通信】", step: name, durationMs: duration, timestamp: new Date().toISOString(), deviceId: deviceId });
         },
 
-        startScreen(screenName) { this.screenTimer = { name: screenName, start: performance.now(); }; },
+        startScreen(screenName) { this.screenTimer = { name: screenName, start: performance.now() }; },
         endScreen() {
             if (!this.screenTimer) return;
             const duration = Math.round(performance.now() - this.screenTimer.start);
@@ -86,7 +84,7 @@
             if (this.logs.length === 0) return;
             try {
                 const dataToSend = JSON.stringify(this.logs);
-                this.logs = []; // 送信キューをクリア
+                this.logs = [];
                 await fetch(`${GAS_URL}?action=savePerformanceLog&logs=${encodeURIComponent(dataToSend)}`);
             } catch(e) {
                 console.error("ログ送信失敗", e);
@@ -227,8 +225,6 @@
                     `&deviceId=${deviceId}`;
                     
         const res = await timedFetch(url, "executeAction");
-        
-        // 蓄積されたパフォーマンスログを一緒にGASへ送信
         await AppLogger.flush();
 
         document.getElementById('loading-overlay').style.display = 'none';
@@ -260,7 +256,7 @@
     
     async function saveConfig() {
         const sel = Array.from(document.querySelectorAll('#configList button')).filter(b => b.className === "btn-blue").map(b => b.innerText).join(',');
-        await timedFetch(`${GAS_URL}?action=saveDeviceConfig&deviceId=${deviceId}&deviceName=${encodeURIComponent(document.getElementById('inputDeviceName', value).value)}&processList=${encodeURIComponent(sel)}`, "saveDeviceConfig");
+        await timedFetch(`${GAS_URL}?action=saveDeviceConfig&deviceId=${deviceId}&deviceName=${encodeURIComponent(document.getElementById('inputDeviceName').value)}&processList=${encodeURIComponent(sel)}`, "saveConfig");
         location.reload();
     }
     
