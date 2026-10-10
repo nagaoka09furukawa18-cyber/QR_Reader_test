@@ -80,6 +80,7 @@
 
     let html5QrCode = null;
     let currentZoomLevel = 2.0; // デフォルト起動倍率を2倍に設定
+    let isRestarting = false;   // 連続クリック防止用ガード
 
     function formatTime(dateObj) {
         const y = dateObj.getFullYear();
@@ -182,21 +183,29 @@
         }, 3000);
     }
 
-    // ── 倍率切り替え：カメラを停止して指定倍率で再起動する ──
+    // ── 倍率切り替え：完全に非同期で停止を待ってから再起動をかける ──
     async function changeZoom(zoomLevel) {
+        if (isRestarting) return; // 処理中の連続クリックを防止
+        isRestarting = true;
         currentZoomLevel = zoomLevel;
-        if (!html5QrCode) return;
 
         try {
-            if (html5QrCode.isScanning) {
-                await html5QrCode.stop();
+            if (html5QrCode) {
+                if (html5QrCode.isScanning) {
+                    console.log("既存のカメラを停止中...");
+                    await html5QrCode.stop();
+                }
+                // インスタンス自体もクリーンアップしておく
+                await html5QrCode.clear();
+                html5QrCode = null;
             }
         } catch (e) {
-            console.log("停止中の例外（無視して続行）:", e);
+            console.log("カメラ停止時の例外（続行します）:", e);
         }
 
-        // 指定倍率でカメラを再起動
+        console.log(`新しい倍率 ${zoomLevel}x でカメラを再起動します...`);
         startCameraWithZoom(zoomLevel);
+        isRestarting = false;
     }
 
     AppLogger.start("STEP1");
@@ -228,7 +237,7 @@
         startCameraWithZoom(currentZoomLevel);
     }
 
-    // ── 指定したズーム倍率でカメラを起動・再起動する共通関数 ──
+    // ── 指定したズーム倍率でカメラを起動する共通関数 ──
     function startCameraWithZoom(zoomLevel) {
         try {
             if (!html5QrCode) {
@@ -245,7 +254,7 @@
 
             const config = { fps: 10, qrbox: 250 };
             
-            // 1倍の場合は通常の背面カメラ、2倍以上の場合は advanced zoom を指定
+            // 1倍は通常の背面カメラ、2倍以上は advanced zoom を指定
             const constraints = zoomLevel === 1.0 
                 ? { facingMode: "environment" }
                 : { facingMode: "environment", advanced: [{ zoom: zoomLevel }] };
@@ -257,7 +266,6 @@
                 })
                 .catch(err => {
                     console.log(`ズーム ${zoomLevel}x の起動に失敗したため標準カメラでフォールバック起動します`, err);
-                    // 万が一非対応の倍率であれば標準カメラで再挑戦
                     html5QrCode.start({ facingMode: "environment" }, config, successCallback)
                         .then(() => {
                             AppLogger.end("STEP2", "QRスキャン開始ボタンを押してスキャン開始できるまで");
@@ -426,9 +434,15 @@
     function refreshSlots(k) { ['proc', 'staff', 'mac'].forEach(id => { document.getElementById('val-'+id).innerText = state[id] || "---"; document.getElementById('slot-'+id).className = 'select-slot ' + (id === k ? 'active-slot' : (!state[id] ? 'disabled' : '')); }); }
     function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
     async function resetToMain() { 
-        if (html5QrCode && html5QrCode.isScanning) {
-            try { await html5QrCode.stop(); } catch(e){}
-        }
+        try {
+            if (html5QrCode) {
+                if (html5QrCode.isScanning) {
+                    await html5QrCode.stop();
+                }
+                await html5QrCode.clear();
+                html5QrCode = null;
+            }
+        } catch(e) {}
         state = { tehai: '', proc: '', staff: '', mac: '', mode: '' }; 
         showScreen('screenMain'); 
     }
