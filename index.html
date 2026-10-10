@@ -26,6 +26,18 @@
         .spinner { border: 6px solid #f3f3f3; border-top: 6px solid #007bff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .test-badge { background: #ff9800; color: white; font-size: 12px; padding: 3px 8px; border-radius: 4px; display: inline-block; margin-bottom: 10px; }
+
+        /* --- カメラ映像のCSSズーム・拡大用スタイル --- */
+        #reader {
+            overflow: hidden;
+            position: relative;
+            border-radius: 8px;
+        }
+        #reader video {
+            transform: scale(var(--zoom-scale, 2.0)); /* デフォルト起動時2倍 */
+            transform-origin: center center;
+            transition: transform 0.2s ease-out;
+        }
     </style>
 </head>
 <body>
@@ -42,7 +54,7 @@
         <button id="btnStartScan" class="btn-blue btn-main" style="display:none;" onclick="startScan()">QRスキャン開始</button>
         <button class="btn-gray" onclick="authAdmin()">管理者設定</button>
     </div>
-    <!-- 倍率切り替えテストボタン付きスキャン画面 -->
+    <!-- CSSズーム切り替えボタン付きスキャン画面 -->
     <div id="screenScanner" class="screen">
         <h3 style="margin: 5px 0 10px 0;">スキャン中...</h3>
         <div style="background: #e9ecef; padding: 8px; border-radius: 8px; margin-bottom: 10px;">
@@ -79,8 +91,6 @@
     };
 
     let html5QrCode = null;
-    let currentZoomLevel = 2.0; // デフォルト起動倍率を2倍に設定
-    let isRestarting = false;   // 連続クリック防止用ガード
 
     function formatTime(dateObj) {
         const y = dateObj.getFullYear();
@@ -183,29 +193,11 @@
         }, 3000);
     }
 
-    // ── 倍率切り替え：完全に非同期で停止を待ってから再起動をかける ──
-    async function changeZoom(zoomLevel) {
-        if (isRestarting) return; // 処理中の連続クリックを防止
-        isRestarting = true;
-        currentZoomLevel = zoomLevel;
-
-        try {
-            if (html5QrCode) {
-                if (html5QrCode.isScanning) {
-                    console.log("既存のカメラを停止中...");
-                    await html5QrCode.stop();
-                }
-                // インスタンス自体もクリーンアップしておく
-                await html5QrCode.clear();
-                html5QrCode = null;
-            }
-        } catch (e) {
-            console.log("カメラ停止時の例外（続行します）:", e);
-        }
-
-        console.log(`新しい倍率 ${zoomLevel}x でカメラを再起動します...`);
-        startCameraWithZoom(zoomLevel);
-        isRestarting = false;
+    // ── CSSによる確実な倍率変更 ──
+    function changeZoom(zoomLevel) {
+        // CSSの変数 `--zoom-scale` を書き換えるだけで、全端末で確実に拡大・縮小します
+        document.documentElement.style.setProperty('--zoom-scale', zoomLevel);
+        console.log(`ズーム倍率を ${zoomLevel}x に変更しました`);
     }
 
     AppLogger.start("STEP1");
@@ -230,15 +222,14 @@
         AppLogger.end("STEP1", "アプリ立ち上げから操作可能になるまで");
     }
 
-    // ── スキャン開始ボタン押下 ──
+    // ── スキャン開始ボタン押下（標準カメラで安定起動） ──
     function startScan() {
         AppLogger.start("STEP2");
         showScreen('screenScanner');
-        startCameraWithZoom(currentZoomLevel);
-    }
+        
+        // 初期状態としてデフォルトの2倍を適用しておく
+        changeZoom(2.0);
 
-    // ── 指定したズーム倍率でカメラを起動する共通関数 ──
-    function startCameraWithZoom(zoomLevel) {
         try {
             if (!html5QrCode) {
                 html5QrCode = new Html5Qrcode("reader");
@@ -253,11 +244,7 @@
             };
 
             const config = { fps: 10, qrbox: 250 };
-            
-            // 1倍は通常の背面カメラ、2倍以上は advanced zoom を指定
-            const constraints = zoomLevel === 1.0 
-                ? { facingMode: "environment" }
-                : { facingMode: "environment", advanced: [{ zoom: zoomLevel }] };
+            const constraints = { facingMode: "environment" };
 
             html5QrCode.start(constraints, config, successCallback)
                 .then(() => {
@@ -265,16 +252,8 @@
                     AppLogger.start("STEP3");
                 })
                 .catch(err => {
-                    console.log(`ズーム ${zoomLevel}x の起動に失敗したため標準カメラでフォールバック起動します`, err);
-                    html5QrCode.start({ facingMode: "environment" }, config, successCallback)
-                        .then(() => {
-                            AppLogger.end("STEP2", "QRスキャン開始ボタンを押してスキャン開始できるまで");
-                            AppLogger.start("STEP3");
-                        })
-                        .catch(fallbackErr => {
-                            alert("カメラの起動に失敗しました: " + fallbackErr);
-                            resetToMain();
-                        });
+                    alert("カメラの起動に失敗しました: " + err);
+                    resetToMain();
                 });
         } catch (err) {
             alert("カメラの起動に失敗しました: " + err);
@@ -435,12 +414,8 @@
     function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
     async function resetToMain() { 
         try {
-            if (html5QrCode) {
-                if (html5QrCode.isScanning) {
-                    await html5QrCode.stop();
-                }
-                await html5QrCode.clear();
-                html5QrCode = null;
+            if (html5QrCode && html5QrCode.isScanning) {
+                await html5QrCode.stop();
             }
         } catch(e) {}
         state = { tehai: '', proc: '', staff: '', mac: '', mode: '' }; 
@@ -455,7 +430,7 @@
             showScreen('screenConfig');
             const cur = (masters.device?.config || "").split(',');
             const list = document.getElementById('configList'); list.innerHTML = "";
-            masters.processes.forEach(p => { const b = document.createElement('button'); b.innerText = p; b.className = cur.includes(p) ? "btn-blue" : "btn-gray"; b.onclick = () => b.className = b.className === "btn-blue" ? "btn-gray" : "btn-blue"; list.appendChild(b); });
+            masters.processes.forEach(p => { const b = document.createElement('button'); b.innerText = p; b.className = cur.includes(p) ? "btn-blue" : "btn-gray"; b.onclick = () => b.className = b.className === "btn-blue" ? "btn-gray" : "btn-gray"; list.appendChild(b); });
         } else alert("エラー");
     }
     
