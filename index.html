@@ -200,14 +200,22 @@
     let html5QrCode = null;
 
     // ── STEP2: QRスキャン開始ボタン押下 ──
+    // ── STEP2: QRスキャン開始ボタン押下 ──
     function startScan() {
         AppLogger.start("STEP2");
         showScreen('screenScanner');
         
         try {
             html5QrCode = new Html5Qrcode("reader");
+            
+            // カメラの制約（2倍ズームを指定）
+            const cameraConfig = {
+                facingMode: "environment",
+                advanced: [{ zoom: 2.0 }] // ここで倍率を指定
+            };
+
             html5QrCode.start(
-                { facingMode: "environment" }, 
+                cameraConfig, 
                 { fps: 10, qrbox: 250 }, 
                 (txt) => {
                     if (html5QrCode && html5QrCode.isScanning) {
