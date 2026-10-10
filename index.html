@@ -42,7 +42,6 @@
         <button id="btnStartScan" class="btn-blue btn-main" style="display:none;" onclick="startScan()">QRスキャン開始</button>
         <button class="btn-gray" onclick="authAdmin()">管理者設定</button>
     </div>
-    <!-- 確実に表示されるようにレイアウトを整理したスキャン画面 -->
     <div id="screenScanner" class="screen">
         <h3 style="margin: 5px 0 10px 0;">スキャン中...</h3>
         <div style="background: #e9ecef; padding: 8px; border-radius: 8px; margin-bottom: 10px;">
@@ -181,11 +180,27 @@
         }, 3000);
     }
 
+    // ── 安全にビデオトラックを取得してズームを変更する関数 ──
     function changeZoom(zoomLevel) {
+        // html5QrCode の内部要素から直接アクティブなトラックを取得し直す
+        try {
+            const videoElement = document.querySelector("#reader video");
+            if (videoElement && videoElement.srcObject) {
+                const stream = videoElement.srcObject;
+                const tracks = stream.getVideoTracks();
+                if (tracks.length > 0) {
+                    currentVideoTrack = tracks[0];
+                }
+            }
+        } catch (e) {
+            console.log("トラック再取得フォールバック:", e);
+        }
+
         if (!currentVideoTrack) {
-            alert("カメラトラックが未取得です");
+            alert("カメラトラックが未取得です。一度スキャンを中止してやり直してください。");
             return;
         }
+
         try {
             const capabilities = currentVideoTrack.getCapabilities ? currentVideoTrack.getCapabilities() : {};
             if (capabilities.zoom) {
@@ -249,15 +264,21 @@
                     }
                 }
             ).then(() => {
-                try {
-                    const videoTracks = html5QrCode.videoStream ? html5QrCode.videoStream.getVideoTracks() : null;
-                    if (videoTracks && videoTracks.length > 0) {
-                        currentVideoTrack = videoTracks[0];
-                        changeZoom(2.0);
+                // カメラ起動・描画完了後にDOMのvideo要素から安全にトラックを取得して初期2倍を適用
+                setTimeout(() => {
+                    try {
+                        const videoElement = document.querySelector("#reader video");
+                        if (videoElement && videoElement.srcObject) {
+                            const tracks = videoElement.srcObject.getVideoTracks();
+                            if (tracks.length > 0) {
+                                currentVideoTrack = tracks[0];
+                                changeZoom(2.0); // 初期起動時に2倍を適用
+                            }
+                        }
+                    } catch (e) {
+                        console.log("初期ズーム自動適用スキップ:", e);
                     }
-                } catch (zoomErr) {
-                    console.log("ズーム制御非対応端末:", zoomErr);
-                }
+                }, 500);
 
                 AppLogger.end("STEP2", "QRスキャン開始ボタンを押してスキャン開始できるまで");
                 AppLogger.start("STEP3");
@@ -420,6 +441,9 @@
     function refreshSlots(k) { ['proc', 'staff', 'mac'].forEach(id => { document.getElementById('val-'+id).innerText = state[id] || "---"; document.getElementById('slot-'+id).className = 'select-slot ' + (id === k ? 'active-slot' : (!state[id] ? 'disabled' : '')); }); }
     function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
     function resetToMain() { 
+        if (html5QrCode && html5QrCode.isScanning) {
+            html5QrCode.stop().catch(() => {});
+        }
         state = { tehai: '', proc: '', staff: '', mac: '', mode: '' }; 
         showScreen('screenMain'); 
     }
