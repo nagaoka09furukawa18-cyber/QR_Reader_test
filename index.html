@@ -13,6 +13,11 @@
         .btn-blue { background: #007bff; color: white; }
         .btn-green { background: #28a745; color: white; }
         .btn-gray { background: #6c757d; color: white; }
+        
+        /* 選択中のボタン用スタイル（アクティブ時：オレンジ色で強調） */
+        .btn-zoom { background: #6c757d; color: white; padding: 6px 14px; font-size: 13px; margin: 0 2px; }
+        .btn-zoom.active-zoom { background: #ff9800; color: white; }
+
         .btn-main { width: 100%; padding: 18px; font-size: 18px; margin: 10px 0; display: block; }
         #tehaiDisplay { font-size: 22px; font-weight: bold; margin-bottom: 15px; color: #333; background: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px solid #eee; }
         #tehaiDisplay span { color: #007bff; margin-left: 10px; }
@@ -27,14 +32,14 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .test-badge { background: #ff9800; color: white; font-size: 12px; padding: 3px 8px; border-radius: 4px; display: inline-block; margin-bottom: 10px; }
 
-        /* --- カメラ映像のCSSズーム・拡大用スタイル --- */
+        /* カメラ映像のCSSズーム・拡大用スタイル */
         #reader {
             overflow: hidden;
             position: relative;
             border-radius: 8px;
         }
         #reader video {
-            transform: scale(var(--zoom-scale, 2.0)); /* デフォルト起動時2倍 */
+            transform: scale(var(--zoom-scale, 2.0));
             transform-origin: center center;
             transition: transform 0.2s ease-out;
         }
@@ -54,14 +59,14 @@
         <button id="btnStartScan" class="btn-blue btn-main" style="display:none;" onclick="startScan()">QRスキャン開始</button>
         <button class="btn-gray" onclick="authAdmin()">管理者設定</button>
     </div>
-    <!-- CSSズーム切り替えボタン付きスキャン画面 -->
+    <!-- ズーム切替ボタン付きスキャン画面 -->
     <div id="screenScanner" class="screen">
         <h3 style="margin: 5px 0 10px 0;">スキャン中...</h3>
         <div style="background: #e9ecef; padding: 8px; border-radius: 8px; margin-bottom: 10px;">
             <span style="font-size: 13px; font-weight: bold; margin-right: 5px;">倍率切替:</span>
-            <button class="btn-gray" style="padding: 6px 12px; font-size: 13px; margin: 0 2px;" onclick="changeZoom(1.0)">1倍</button>
-            <button class="btn-blue" style="padding: 6px 12px; font-size: 13px; margin: 0 2px;" onclick="changeZoom(2.0)">2倍</button>
-            <button class="btn-blue" style="padding: 6px 12px; font-size: 13px; margin: 0 2px;" onclick="changeZoom(3.0)">3倍</button>
+            <button id="btnZoom1" class="btn-zoom" onclick="changeZoom(1.0)">1倍</button>
+            <button id="btnZoom2" class="btn-zoom active-zoom" onclick="changeZoom(2.0)">2倍</button>
+            <button id="btnZoom3" class="btn-zoom" onclick="changeZoom(3.0)">3倍</button>
         </div>
         <div id="reader" style="width: 100%;"></div>
         <button class="btn-gray" onclick="resetToMain()" style="margin-top: 15px; width: 100%;">中止</button>
@@ -193,10 +198,16 @@
         }, 3000);
     }
 
-    // ── CSSによる確実な倍率変更 ──
+    // ── 倍率変更と選択ボタンの色切り替え ──
     function changeZoom(zoomLevel) {
-        // CSSの変数 `--zoom-scale` を書き換えるだけで、全端末で確実に拡大・縮小します
         document.documentElement.style.setProperty('--zoom-scale', zoomLevel);
+        
+        // すべてのボタンから active-zoom を外し、押されたボタンだけに付与
+        document.querySelectorAll('.btn-zoom').forEach(btn => btn.classList.remove('active-zoom'));
+        if (zoomLevel === 1.0) document.getElementById('btnZoom1').classList.add('active-zoom');
+        if (zoomLevel === 2.0) document.getElementById('btnZoom2').classList.add('active-zoom');
+        if (zoomLevel === 3.0) document.getElementById('btnZoom3').classList.add('active-zoom');
+
         console.log(`ズーム倍率を ${zoomLevel}x に変更しました`);
     }
 
@@ -222,12 +233,11 @@
         AppLogger.end("STEP1", "アプリ立ち上げから操作可能になるまで");
     }
 
-    // ── スキャン開始ボタン押下（標準カメラで安定起動） ──
     function startScan() {
         AppLogger.start("STEP2");
         showScreen('screenScanner');
         
-        // 初期状態としてデフォルトの2倍を適用しておく
+        // 起動時はデフォルトの2倍を適用し、ボタンの色も2倍に合わせる
         changeZoom(2.0);
 
         try {
@@ -430,7 +440,7 @@
             showScreen('screenConfig');
             const cur = (masters.device?.config || "").split(',');
             const list = document.getElementById('configList'); list.innerHTML = "";
-            masters.processes.forEach(p => { const b = document.createElement('button'); b.innerText = p; b.className = cur.includes(p) ? "btn-blue" : "btn-gray"; b.onclick = () => b.className = b.className === "btn-blue" ? "btn-gray" : "btn-gray"; list.appendChild(b); });
+            masters.processes.forEach(p => { const b = document.createElement('button'); b.innerText = p; b.className = cur.includes(p) ? "btn-blue" : "btn-gray"; b.onclick = () => b.className = b.className === "btn-blue" ? "btn-gray" : "btn-blue"; list.appendChild(b); });
         } else alert("エラー");
     }
     
