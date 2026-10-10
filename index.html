@@ -199,7 +199,7 @@
 
     let html5QrCode = null;
 
-    // ── STEP2: QRスキャン開始ボタン押下 ──
+    // ── STEP2: QRスキャン開始ボタン押下（安全なズーム適用版） ──
     function startScan() {
         AppLogger.start("STEP2");
         showScreen('screenScanner');
@@ -207,10 +207,8 @@
         try {
             html5QrCode = new Html5Qrcode("reader");
             
-            // 修正: サポート外の advanced 制約を外し、標準のカメラ指定に戻す
-            const cameraConfig = {
-                facingMode: "environment"
-            };
+            // まずは安全な標準設定でカメラを起動
+            const cameraConfig = { facingMode: "environment" };
 
             html5QrCode.start(
                 cameraConfig, 
@@ -223,6 +221,25 @@
                     }
                 }
             ).then(() => {
+                // カメラ起動成功後、少し遅れて（またはその場で）トラックからズーム機能を安全に適用する
+                try {
+                    const videoTracks = html5QrCode.videoStream ? html5QrCode.videoStream.getVideoTracks() : null;
+                    if (videoTracks && videoTracks.length > 0) {
+                        const track = videoTracks[0];
+                        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+                        
+                        // 端末がズーム機能に対応している場合のみ2倍（または許容範囲内）を適用
+                        if (capabilities.zoom) {
+                            const targetZoom = Math.min(2.0, capabilities.zoom.max || 2.0);
+                            track.applyConstraints({ advanced: [{ zoom: targetZoom }] }).catch(err => {
+                                console.log("ズーム適用スキップ:", err);
+                            });
+                        }
+                    }
+                } catch (zoomErr) {
+                    console.log("ズーム制御非対応端末:", zoomErr);
+                }
+
                 AppLogger.end("STEP2", "QRスキャン開始ボタンを押してスキャン開始できるまで");
                 AppLogger.start("STEP3");
             });
