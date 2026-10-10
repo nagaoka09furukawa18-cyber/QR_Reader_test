@@ -200,7 +200,6 @@
     let html5QrCode = null;
 
     // ── STEP2: QRスキャン開始ボタン押下 ──
-    // ── STEP2: QRスキャン開始ボタン押下 ──
     function startScan() {
         AppLogger.start("STEP2");
         showScreen('screenScanner');
@@ -208,10 +207,9 @@
         try {
             html5QrCode = new Html5Qrcode("reader");
             
-            // カメラの制約（2倍ズームを指定）
+            // 修正: サポート外の advanced 制約を外し、標準のカメラ指定に戻す
             const cameraConfig = {
-                facingMode: "environment",
-                advanced: [{ zoom: 2.0 }] // ここで倍率を指定
+                facingMode: "environment"
             };
 
             html5QrCode.start(
@@ -233,7 +231,6 @@
             resetToMain();
         }
     }
-
     // ── STEP3 & STEP4 (仮想DBを活用した爆速ローカル判定) ──
     async function onScanSuccess(no) {
         state = { tehai: String(no).trim(), proc: '', staff: '', mac: '', mode: '' };
