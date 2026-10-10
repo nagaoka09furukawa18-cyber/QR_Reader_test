@@ -42,16 +42,17 @@
         <button id="btnStartScan" class="btn-blue btn-main" style="display:none;" onclick="startScan()">QRスキャン開始</button>
         <button class="btn-gray" onclick="authAdmin()">管理者設定</button>
     </div>
-    <!-- ズームテスト用ボタンを追加したスキャン画面 -->
+    <!-- 確実に表示されるようにレイアウトを整理したスキャン画面 -->
     <div id="screenScanner" class="screen">
-        <h3>スキャン中...</h3>
-        <div style="margin: 8px 0;">
-            <button class="btn-gray" style="padding: 6px 14px; font-size: 13px;" onclick="changeZoom(1.0)">1倍</button>
-            <button class="btn-blue" style="padding: 6px 14px; font-size: 13px;" onclick="changeZoom(2.0)">2倍</button>
-            <button class="btn-blue" style="padding: 6px 14px; font-size: 13px;" onclick="changeZoom(3.0)">3倍</button>
+        <h3 style="margin: 5px 0 10px 0;">スキャン中...</h3>
+        <div style="background: #e9ecef; padding: 8px; border-radius: 8px; margin-bottom: 10px;">
+            <span style="font-size: 13px; font-weight: bold; margin-right: 5px;">ズームテスト:</span>
+            <button class="btn-gray" style="padding: 6px 12px; font-size: 13px; margin: 0 2px;" onclick="changeZoom(1.0)">1倍</button>
+            <button class="btn-blue" style="padding: 6px 12px; font-size: 13px; margin: 0 2px;" onclick="changeZoom(2.0)">2倍</button>
+            <button class="btn-blue" style="padding: 6px 12px; font-size: 13px; margin: 0 2px;" onclick="changeZoom(3.0)">3倍</button>
         </div>
-        <div id="reader"></div>
-        <button class="btn-gray" onclick="resetToMain()" style="margin-top: 10px;">中止</button>
+        <div id="reader" style="width: 100%;"></div>
+        <button class="btn-gray" onclick="resetToMain()" style="margin-top: 15px; width: 100%;">中止</button>
     </div>
     <div id="screenDetail" class="screen">
         <div id="tehaiDisplay"></div>
@@ -72,13 +73,12 @@
     let deviceId = localStorage.getItem('test_deviceId') || 'TEST-ID-' + Math.random().toString(36).substring(2, 8).toUpperCase();
     localStorage.setItem('test_deviceId', deviceId);
 
-    // ── スマホ側 仮想DB（ローカルステート）管理 ──
     let virtualDB = {
-        items: new Map(), // key: 手配No, value: 行データ配列
+        items: new Map(),
         isLoaded: false
     };
 
-    let currentVideoTrack = null; // カメラのビデオトラック保持用
+    let currentVideoTrack = null;
 
     function formatTime(dateObj) {
         const y = dateObj.getFullYear();
@@ -141,7 +141,6 @@
         }
     }
 
-    // ── 仮想DBの初期ロード ──
     async function initVirtualDB(processName) {
         if (!processName) return;
         try {
@@ -155,14 +154,12 @@
                     }
                 });
                 virtualDB.isLoaded = true;
-                console.log("【仮想DB】初期ロード完了. 保持件数:", virtualDB.items.size);
             }
         } catch (err) {
             console.error("【仮想DB】初期ロード失敗:", err);
         }
     }
 
-    // ── バックグラウンド・サイレント同期 ──
     function triggerBackgroundSync(processName) {
         setTimeout(async () => {
             if (!processName) return;
@@ -177,7 +174,6 @@
                         }
                     });
                     virtualDB.isLoaded = true;
-                    console.log("【仮想DB】バックグラウンド同期完了. 最新件数:", virtualDB.items.size);
                 }
             } catch (err) {
                 console.error("【仮想DB】バックグラウンド同期エラー:", err);
@@ -185,10 +181,9 @@
         }, 3000);
     }
 
-    // ── ズーム変更テスト関数 ──
     function changeZoom(zoomLevel) {
         if (!currentVideoTrack) {
-            console.log("カメラトラックが取得できていません");
+            alert("カメラトラックが未取得です");
             return;
         }
         try {
@@ -210,7 +205,6 @@
         }
     }
 
-    // ── STEP1: アプリ立ち上げ開始 ──
     AppLogger.start("STEP1");
 
     async function init() {
@@ -235,11 +229,10 @@
 
     let html5QrCode = null;
 
-    // ── STEP2: QRスキャン開始ボタン押下（ズームテスト対応版） ──
     function startScan() {
         AppLogger.start("STEP2");
         showScreen('screenScanner');
-        currentVideoTrack = null; // リセット
+        currentVideoTrack = null;
         
         try {
             html5QrCode = new Html5Qrcode("reader");
@@ -256,12 +249,11 @@
                     }
                 }
             ).then(() => {
-                // カメラ起動成功後、ビデオトラックを保持して初期ズーム（例：2倍）を適用
                 try {
                     const videoTracks = html5QrCode.videoStream ? html5QrCode.videoStream.getVideoTracks() : null;
                     if (videoTracks && videoTracks.length > 0) {
                         currentVideoTrack = videoTracks[0];
-                        changeZoom(2.0); // デフォルト2倍適用を試行
+                        changeZoom(2.0);
                     }
                 } catch (zoomErr) {
                     console.log("ズーム制御非対応端末:", zoomErr);
@@ -276,7 +268,6 @@
         }
     }
 
-    // ── STEP3 & STEP4 (仮想DBを活用した爆速ローカル判定) ──
     async function onScanSuccess(no) {
         state = { tehai: String(no).trim(), proc: '', staff: '', mac: '', mode: '' };
         
@@ -328,7 +319,6 @@
         }
     }
 
-    // ── STEP5: 工程・作業者・装置選択 ──
     function renderStartProcUI() {
         AppLogger.start("STEP5");
         state.proc = ''; refreshSlots('proc');
@@ -375,7 +365,6 @@
         }; document.getElementById('button-area').appendChild(b); });
     }
 
-    // ── STEP6: 実行ボタン押下待ち ──
     function renderFinalConfirm(msg) {
         AppLogger.start("STEP6");
         document.getElementById('button-area').innerHTML = "";
@@ -388,7 +377,6 @@
         document.getElementById('button-area').appendChild(b);
     }
 
-    // ── STEP7: サーバーへ確実な書き込み＆仮想DBのローカル即時更新 ──
     async function finalizeAction() {
         AppLogger.start("STEP7");
         
