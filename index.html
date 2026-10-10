@@ -65,7 +65,7 @@
         <div style="background: #e9ecef; padding: 8px; border-radius: 8px; margin-bottom: 10px;">
             <span style="font-size: 13px; font-weight: bold; margin-right: 5px;">倍率切替:</span>
             <button id="btnZoom1" class="btn-zoom" onclick="changeZoom(1.0)">1倍</button>
-            <button id="btnZoom2" class="btn-zoom active-zoom" onclick="changeZoom(2.0)">2倍</button>
+            <button id="btnZoom2" class="btn-zoom" onclick="changeZoom(2.0)">2倍</button>
             <button id="btnZoom3" class="btn-zoom" onclick="changeZoom(3.0)">3倍</button>
         </div>
         <div id="reader" style="width: 100%;"></div>
@@ -96,6 +96,7 @@
     };
 
     let html5QrCode = null;
+    let savedZoomLevel = 2.0; // システム起動時の初期デフォルトは2倍
 
     function formatTime(dateObj) {
         const y = dateObj.getFullYear();
@@ -198,11 +199,11 @@
         }, 3000);
     }
 
-    // ── 倍率変更と選択ボタンの色切り替え ──
+    // ── 倍率変更と選択ボタンの色切り替え（状態保持対応） ──
     function changeZoom(zoomLevel) {
+        savedZoomLevel = zoomLevel; // 選択した倍率をメモリ上に保持
         document.documentElement.style.setProperty('--zoom-scale', zoomLevel);
         
-        // すべてのボタンから active-zoom を外し、押されたボタンだけに付与
         document.querySelectorAll('.btn-zoom').forEach(btn => btn.classList.remove('active-zoom'));
         if (zoomLevel === 1.0) document.getElementById('btnZoom1').classList.add('active-zoom');
         if (zoomLevel === 2.0) document.getElementById('btnZoom2').classList.add('active-zoom');
@@ -237,8 +238,8 @@
         AppLogger.start("STEP2");
         showScreen('screenScanner');
         
-        // 起動時はデフォルトの2倍を適用し、ボタンの色も2倍に合わせる
-        changeZoom(2.0);
+        // 前回選択または維持された倍率をスキャン開始時に適用
+        changeZoom(savedZoomLevel);
 
         try {
             if (!html5QrCode) {
