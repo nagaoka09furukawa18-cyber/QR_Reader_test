@@ -62,6 +62,12 @@
     let deviceId = localStorage.getItem('test_deviceId') || 'TEST-ID-' + Math.random().toString(36).substring(2, 8).toUpperCase();
     localStorage.setItem('test_deviceId', deviceId);
 
+    // ── スマホ側 仮想DB（ローカルステート）管理 ──
+    let virtualDB = {
+        items: new Map(), // key: 手配No, value: 行データ配列
+        isLoaded: false
+    };
+
     function formatTime(dateObj) {
         const y = dateObj.getFullYear();
         const m = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -91,7 +97,7 @@
             this.logs.push({
                 type: `【${stepKey}】`,
                 step: stepLabel,
-                tehaiNo: state.tehai || "", // 読み取った手配No
+                tehaiNo: state.tehai || "", 
                 startTime: formatTime(startTimeObj),
                 endTime: formatTime(endTimeObj),
                 durationMs: perfDuration,
@@ -123,6 +129,50 @@
         }
     }
 
+    // ── 仮想DBの初期ロード（アプリ起動時にバックグラウンドまたはロード時に取得） ──
+    async function initVirtualDB(processName) {
+        if (!processName) return;
+        try {
+            const res = await callGas(`${GAS_URL}?action=getActiveDataForProcess&process=${encodeURIComponent(processName)}`);
+            if (res && res.success && Array.isArray(res.data)) {
+                virtualDB.items.clear();
+                res.data.forEach(row => {
+                    const tehaiNo = String(row[0]).trim();
+                    if (tehaiNo) {
+                        virtualDB.items.set(tehaiNo, row);
+                    }
+                });
+                virtualDB.isLoaded = true;
+                console.log("【仮想DB】初期ロード完了. 保持件数:", virtualDB.items.size);
+            }
+        } catch (err) {
+            console.error("【仮想DB】初期ロード失敗:", err);
+        }
+    }
+
+    // ── バックグラウンド・サイレント同期（処理完了後のアイドル時間に実行） ──
+    function triggerBackgroundSync(processName) {
+        setTimeout(async () => {
+            if (!processName) return;
+            try {
+                const res = await callGas(`${GAS_URL}?action=getActiveDataForProcess&process=${encodeURIComponent(processName)}`);
+                if (res && res.success && Array.isArray(res.data)) {
+                    virtualDB.items.clear();
+                    res.data.forEach(row => {
+                        const tehaiNo = String(row[0]).trim();
+                        if (tehaiNo) {
+                            virtualDB.items.set(tehaiNo, row);
+                        }
+                    });
+                    virtualDB.isLoaded = true;
+                    console.log("【仮想DB】バックグラウンド同期完了. 最新件数:", virtualDB.items.size);
+                }
+            } catch (err) {
+                console.error("【仮想DB】バックグラウンド同期エラー:", err);
+            }
+        }, 3000); // 3秒後のアイドル時間に裏で同期
+    }
+
     // ── STEP1: アプリ立ち上げ開始 ──
     AppLogger.start("STEP1");
 
@@ -132,11 +182,16 @@
         
         masters = await callGas(GAS_URL + "?action=getAllMasters&deviceId=" + deviceId);
         
-        document.getElementById('loading-overlay').style.display = 'none';
-        if (masters.device) { 
+        if (masters.device && masters.device.config) { 
+            // 端末設定の工程を取得して仮想DBを初期ロードしておく
+            const primaryProcess = masters.device.config.split(',')[0].trim();
+            await initVirtualDB(primaryProcess);
+
             document.getElementById('currentStation').innerText = `端末: ${masters.device.name}\n工程: ${masters.device.config}`; 
             document.getElementById('btnStartScan').style.display = "block"; 
         }
+        
+        document.getElementById('loading-overlay').style.display = 'none';
         showScreen('screenMain');
         
         AppLogger.end("STEP1", "アプリ立ち上げから操作可能になるまで");
@@ -171,7 +226,7 @@
         }
     }
 
-    // ── STEP3 & STEP4 ──
+    // ── STEP3 & STEP4 (仮想DBを活用した爆速ローカル判定) ──
     async function onScanSuccess(no) {
         state = { tehai: String(no).trim(), proc: '', staff: '', mac: '', mode: '' };
         
@@ -181,28 +236,46 @@
         document.getElementById('tehaiDisplay').innerHTML = `手配No：<span>${state.tehai}</span>`;
         document.getElementById('button-area').innerHTML = "";
         showScreen('screenDetail');
-        document.getElementById('loading-text').innerText = "作業開始・終了を確認中...";
-        document.getElementById('loading-overlay').style.display = 'flex';
-        
-        const procListParam = masters.device ? masters.device.config : "";
-        const res = await callGas(`${GAS_URL}?action=checkStatus&tehaiNo=${encodeURIComponent(state.tehai)}&processList=${encodeURIComponent(procListParam)}`);
-        
-        document.getElementById('loading-overlay').style.display = 'none';
+
+        let res = null;
+
+        // まずは爆速のスマホ仮想DBで判定を試みる
+        if (virtualDB.isLoaded) {
+            const targetNo = state.tehai;
+            const foundData = virtualDB.items.get(targetNo);
+
+            if (foundData) {
+                if (foundData[4] !== "" && foundData[4] != null) {
+                    res = { success: true, mode: "END", workData: foundData, process: foundData[1] };
+                } else {
+                    res = { success: false, mode: "ERROR", message: "開始時間が記録されていません" };
+                }
+            } else {
+                res = { success: true, mode: "START" };
+            }
+        } else {
+            // 万が一仮想DB未ロード時のフォールバック（従来型サーバー通信）
+            document.getElementById('loading-text').innerText = "確認中...";
+            document.getElementById('loading-overlay').style.display = 'flex';
+            const procListParam = masters.device ? masters.device.config : "";
+            res = await callGas(`${GAS_URL}?action=checkStatus&tehaiNo=${encodeURIComponent(state.tehai)}&processList=${encodeURIComponent(procListParam)}`);
+            document.getElementById('loading-overlay').style.display = 'none';
+        }
 
         AppLogger.end("STEP4", "作業開始/終了確認時間");
 
-        if (res.mode === "END") {
+        if (res.success && res.mode === "END") {
             state.mode = "END";
             state.proc = res.process;
             state.staff = res.workData[2]; 
             state.mac = res.workData[3];
             refreshSlots();
             renderFinalConfirm("完了報告を送信しますか？");
-        } else if (res.mode === "START") {
+        } else if (res.success && res.mode === "START") {
             state.mode = "START";
             renderStartProcUI();
         } else {
-            alert("エラー: " + res.message);
+            alert("エラー: " + (res.message || "対象データが見つかりません"));
             resetToMain();
         }
     }
@@ -250,7 +323,6 @@
             refreshSlots('mac'); 
             
             AppLogger.end("STEP5", "工程を選択開始し、作業者、装置名が選択された時間");
-
             renderFinalConfirm("開始準備完了"); 
         }; document.getElementById('button-area').appendChild(b); });
     }
@@ -268,10 +340,8 @@
         document.getElementById('button-area').appendChild(b);
     }
 
-    // ── STEP7: データ保存 ──
-    // ── STEP7: データ保存 ──
+    // ── STEP7: サーバーへ確実な書き込み＆仮想DBのローカル即時更新 ──
     async function finalizeAction() {
-        // 1. 計測開始
         AppLogger.start("STEP7");
         
         document.getElementById('loading-text').innerText = "データ保存中...";
@@ -286,20 +356,31 @@
                     `&type=${state.mode === 'END' ? 'end' : 'start'}` +
                     `&deviceId=${deviceId}`;
                     
-        // 2. GASとの通信
+        // サーバー側スプレッドシートへの書き込み・削除を確実に待つ
         const res = await callGas(url);
         
-        // 3. タイマー終了＆ログ記録
         AppLogger.end("STEP7", "データ保存開始から成功しましたまで");
 
-        // 5. ローダーを非表示にする
         document.getElementById('loading-overlay').style.display = 'none';
 
-        // 6. アラート（ダイアログ）を開く・表示する
-        alert(res.success ? "成功しました" : "失敗: " + res.message);
-        resetToMain();
+        if (res.success) {
+            // サーバー書き込み成功が確定したため、ローカル仮想DBも即時同期更新
+            if (state.mode === 'START') {
+                const newRow = [state.tehai, state.proc, state.staff, state.mac, new Date().toISOString(), "", devName, deviceId];
+                virtualDB.items.set(state.tehai, newRow);
+            } else if (state.mode === 'END') {
+                virtualDB.items.delete(state.tehai);
+            }
 
-        // 4. 【6の後で実行】ログ送信の追加通信を後ろに回す
+            alert("成功しました");
+            resetToMain();
+
+            // 完了後のアイドル時間に裏でバックグラウンド同期を走らせて完全に整合性を合わせる
+            triggerBackgroundSync(state.proc);
+        } else {
+            alert("失敗: " + res.message);
+        }
+
         await AppLogger.flush();
     }
 
