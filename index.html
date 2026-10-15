@@ -65,7 +65,7 @@
         <div style="background: #e9ecef; padding: 8px; border-radius: 8px; margin-bottom: 10px;">
             <span style="font-size: 13px; font-weight: bold; margin-right: 5px;">倍率切替:</span>
             <button id="btnZoom1" class="btn-zoom" onclick="changeZoom(1.0)">1倍</button>
-            <button id="btnZoom2" class="btn-zoom" onclick="changeZoom(2.0)">2倍</button>
+            <button id="btnZoom2" class="btn-zoom active-zoom" onclick="changeZoom(2.0)">2倍</button>
             <button id="btnZoom3" class="btn-zoom" onclick="changeZoom(3.0)">3倍</button>
         </div>
         <div id="reader" style="width: 100%;"></div>
@@ -96,7 +96,7 @@
     };
 
     let html5QrCode = null;
-    let savedZoomLevel = 2.0; // システム起動時の初期デフォルトは2倍
+    let savedZoomLevel = 2.0;
 
     function formatTime(dateObj) {
         const y = dateObj.getFullYear();
@@ -199,17 +199,14 @@
         }, 3000);
     }
 
-    // 倍率変更と選択ボタンの色切り替え（状態保持対応）
     function changeZoom(zoomLevel) {
-        savedZoomLevel = zoomLevel; // 選択した倍率をメモリ上に保持
+        savedZoomLevel = zoomLevel;
         document.documentElement.style.setProperty('--zoom-scale', zoomLevel);
         
         document.querySelectorAll('.btn-zoom').forEach(btn => btn.classList.remove('active-zoom'));
         if (zoomLevel === 1.0) document.getElementById('btnZoom1').classList.add('active-zoom');
         if (zoomLevel === 2.0) document.getElementById('btnZoom2').classList.add('active-zoom');
         if (zoomLevel === 3.0) document.getElementById('btnZoom3').classList.add('active-zoom');
-
-        console.log(`ズーム倍率を ${zoomLevel}x に変更しました`);
     }
 
     AppLogger.start("STEP1");
@@ -237,8 +234,6 @@
     function startScan() {
         AppLogger.start("STEP2");
         showScreen('screenScanner');
-        
-        // 前回選択または維持された倍率をスキャン開始時に適用
         changeZoom(savedZoomLevel);
 
         try {
@@ -338,7 +333,6 @@
         state.proc = p; 
         refreshSlots('proc'); 
         
-        // 工程名に "HT" が含まれているかチェック
         if (p.toUpperCase().includes("HT")) {
             renderStartHtUI();
         } else {
@@ -346,11 +340,9 @@
         }
     }
 
-    // HT工程用の選択UI（M_HTリストの項目を選択）
     function renderStartHtUI() {
-        // UI上のスロットラベルをHT項目用に切り替え
         document.getElementById('slot-staff').innerHTML = 'HT項目: <strong id="val-staff">---</strong>';
-        document.getElementById('slot-mac').style.display = 'none'; // 装置名は不要なので非表示
+        document.getElementById('slot-mac').style.display = 'none';
 
         refreshSlots('staff');
         const list = masters.htList || [];
@@ -368,8 +360,8 @@
             b.className = "btn-blue"; 
             b.innerText = item; 
             b.onclick = () => {
-                state.staff = item; // 保存時は staff の位置に格納
-                state.mac = "";     // HTの場合は装置名なし
+                state.staff = item; 
+                state.mac = "";     
                 refreshSlots('staff');
                 
                 AppLogger.end("STEP5", "工程を選択開始し、HT項目が選択された時間");
@@ -380,7 +372,6 @@
     }
 
     function renderStartStaffUI() {
-        // 通常工程用に戻す
         document.getElementById('slot-staff').innerHTML = '作業者: <strong id="val-staff">---</strong>';
         document.getElementById('slot-mac').style.display = 'block';
 
@@ -486,7 +477,6 @@
             }
         } catch(e) {}
         
-        // 画面リセット時にスロット表示や装置名欄を通常状態に戻す
         document.getElementById('slot-staff').innerHTML = '作業者: <strong id="val-staff">---</strong>';
         document.getElementById('slot-mac').style.display = 'block';
 
