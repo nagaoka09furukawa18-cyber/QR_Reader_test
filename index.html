@@ -74,7 +74,7 @@
     <div id="screenDetail" class="screen">
         <div id="tehaiDisplay"></div>
         <div id="slot-proc" class="select-slot">工程名: <strong id="val-proc">---</strong></div>
-        <div id="slot-staff" class="select-slot">作業者: <strong id="val-staff">---</strong></div>
+        <div id="slot-staff" class="select-slot">HT項目: <strong id="val-staff">---</strong></div>
         <div id="slot-mac" class="select-slot">装置名: <strong id="val-mac">---</strong></div>
         <div id="button-container"><div id="button-title"></div><div id="button-area"></div></div>
         <button class="btn-gray" onclick="resetToMain()" style="margin-top:20px;">最初からやり直す</button>
@@ -341,6 +341,7 @@
     }
 
     function renderStartHtUI() {
+        // スロットのラベル設定（HT項目を表示、装置名は隠す）
         document.getElementById('slot-staff').innerHTML = 'HT項目: <strong id="val-staff">---</strong>';
         document.getElementById('slot-mac').style.display = 'none';
 
@@ -348,10 +349,10 @@
         const list = masters.htList || [];
         
         document.getElementById('button-area').innerHTML = "";
-        document.getElementById('button-title').innerText = "HT項目選択";
+        document.getElementById('button-title').innerText = "HTリスト選択";
         
         if (list.length === 0) {
-            document.getElementById('button-area').innerHTML = "<p style='color:red;'>M_HTリストにデータがありません</p>";
+            document.getElementById('button-area').innerHTML = "<p style='color:red;'>M_HTリスト（A列）にデータがありません</p>";
             return;
         }
 
@@ -360,11 +361,11 @@
             b.className = "btn-blue"; 
             b.innerText = item; 
             b.onclick = () => {
-                state.staff = item; 
-                state.mac = "";     
+                state.staff = item; // 担当者・項目の位置に保存
+                state.mac = "";     // 装置名は空
                 refreshSlots('staff');
                 
-                AppLogger.end("STEP5", "工程を選択開始し、HT項目が選択された時間");
+                AppLogger.end("STEP5", "工程を選択開始し、HTリスト項目が選択された時間");
                 renderFinalConfirm("開始準備完了"); 
             }; 
             document.getElementById('button-area').appendChild(b); 
@@ -477,6 +478,7 @@
             }
         } catch(e) {}
         
+        // 通常の状態にリセット
         document.getElementById('slot-staff').innerHTML = '作業者: <strong id="val-staff">---</strong>';
         document.getElementById('slot-mac').style.display = 'block';
 
