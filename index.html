@@ -622,13 +622,28 @@
     function authAdmin() { showScreen('screenAuth'); }
     
     async function checkPassword() {
+        const passwordInput = document.getElementById('adminPwInput').value;
+        if (!passwordInput) {
+            alert("パスワードが違います");
+            return;
+        }
+
         const res = await callGas(GAS_URL + "?action=getAdminPassword");
-        if (document.getElementById('adminPwInput').value === String(res.password).trim()) {
+        if (passwordInput === String(res.password).trim()) {
             showScreen('screenConfig');
             const cur = (masters.device?.config || "").split(',');
-            const list = document.getElementById('configList'); list.innerHTML = "";
-            masters.processes.forEach(p => { const b = document.createElement('button'); b.innerText = p; b.className = cur.includes(p) ? "btn-blue" : "btn-gray"; b.onclick = () => b.className = b.className === "btn-blue" ? "btn-gray" : "btn-blue"; list.appendChild(b); });
-        } else alert("エラー");
+            const list = document.getElementById('configList'); 
+            list.innerHTML = "";
+            masters.processes.forEach(p => { 
+                const b = document.createElement('button'); 
+                b.innerText = p; 
+                b.className = cur.includes(p) ? "btn-blue" : "btn-gray"; 
+                b.onclick = () => b.className = b.className === "btn-blue" ? "btn-gray" : "btn-blue"; 
+                list.appendChild(b); 
+            });
+        } else {
+            alert("パスワードが違います");
+        }
     }
     
     async function saveConfig() {
