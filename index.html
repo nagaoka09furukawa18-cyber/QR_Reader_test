@@ -86,7 +86,7 @@
     const GAS_URL = "https://script.google.com/macros/s/AKfycbwUe_IeJYIBaAfJqa2-KNepwKESmkV--q_ana70xwh_big9OU3PAtkBj1R2dZymkI2E/exec";
 
     let state = { tehai: '', proc: '', staff: '', mac: '', mode: '' };
-    let masters = { processes: [], staffs: [], machines: [], device: null };
+    let masters = { processes: [], staffs: [], machines: [], htList: [], device: null };
     let deviceId = localStorage.getItem('test_deviceId') || 'TEST-ID-' + Math.random().toString(36).substring(2, 8).toUpperCase();
     localStorage.setItem('test_deviceId', deviceId);
 
@@ -199,7 +199,7 @@
         }, 3000);
     }
 
-    // ── 倍率変更と選択ボタンの色切り替え（状態保持対応） ──
+    // 倍率変更と選択ボタンの色切り替え（状態保持対応）
     function changeZoom(zoomLevel) {
         savedZoomLevel = zoomLevel; // 選択した倍率をメモリ上に保持
         document.documentElement.style.setProperty('--zoom-scale', zoomLevel);
@@ -333,13 +333,57 @@
             list.forEach(p => { const b = document.createElement('button'); b.className = "btn-blue"; b.innerText = p; b.onclick = () => selectProc(p); document.getElementById('button-area').appendChild(b); });
         }
     }
+
     function selectProc(p) { 
         state.proc = p; 
         refreshSlots('proc'); 
-        renderStartStaffUI(); 
+        
+        // 工程名に "HT" が含まれているかチェック
+        if (p.toUpperCase().includes("HT")) {
+            renderStartHtUI();
+        } else {
+            renderStartStaffUI(); 
+        }
+    }
+
+    // HT工程用の選択UI（M_HTリストの項目を選択）
+    function renderStartHtUI() {
+        // UI上のスロットラベルをHT項目用に切り替え
+        document.getElementById('slot-staff').innerHTML = 'HT項目: <strong id="val-staff">---</strong>';
+        document.getElementById('slot-mac').style.display = 'none'; // 装置名は不要なので非表示
+
+        refreshSlots('staff');
+        const list = masters.htList || [];
+        
+        document.getElementById('button-area').innerHTML = "";
+        document.getElementById('button-title').innerText = "HT項目選択";
+        
+        if (list.length === 0) {
+            document.getElementById('button-area').innerHTML = "<p style='color:red;'>M_HTリストにデータがありません</p>";
+            return;
+        }
+
+        list.forEach(item => { 
+            const b = document.createElement('button'); 
+            b.className = "btn-blue"; 
+            b.innerText = item; 
+            b.onclick = () => {
+                state.staff = item; // 保存時は staff の位置に格納
+                state.mac = "";     // HTの場合は装置名なし
+                refreshSlots('staff');
+                
+                AppLogger.end("STEP5", "工程を選択開始し、HT項目が選択された時間");
+                renderFinalConfirm("開始準備完了"); 
+            }; 
+            document.getElementById('button-area').appendChild(b); 
+        });
     }
 
     function renderStartStaffUI() {
+        // 通常工程用に戻す
+        document.getElementById('slot-staff').innerHTML = '作業者: <strong id="val-staff">---</strong>';
+        document.getElementById('slot-mac').style.display = 'block';
+
         refreshSlots('staff');
         const list = masters.staffs.filter(r => String(r[0]).trim() === state.proc).map(r => String(r[1]).split(',')).flat().filter(Boolean);
         if (list.length === 1) { selectStaff(list[0]); }
@@ -349,6 +393,7 @@
             list.forEach(s => { const b = document.createElement('button'); b.className = "btn-green"; b.innerText = s; b.onclick = () => selectStaff(s); document.getElementById('button-area').appendChild(b); });
         }
     }
+
     function selectStaff(s) { 
         state.staff = s; 
         refreshSlots('staff'); 
@@ -421,14 +466,30 @@
         await AppLogger.flush();
     }
 
-    function refreshSlots(k) { ['proc', 'staff', 'mac'].forEach(id => { document.getElementById('val-'+id).innerText = state[id] || "---"; document.getElementById('slot-'+id).className = 'select-slot ' + (id === k ? 'active-slot' : (!state[id] ? 'disabled' : '')); }); }
+    function refreshSlots(k) { 
+        ['proc', 'staff', 'mac'].forEach(id => { 
+            const el = document.getElementById('val-'+id);
+            if (el) el.innerText = state[id] || "---"; 
+            const slotEl = document.getElementById('slot-'+id);
+            if (slotEl) {
+                slotEl.className = 'select-slot ' + (id === k ? 'active-slot' : (!state[id] ? 'disabled' : '')); 
+            }
+        }); 
+    }
+
     function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+    
     async function resetToMain() { 
         try {
             if (html5QrCode && html5QrCode.isScanning) {
                 await html5QrCode.stop();
             }
         } catch(e) {}
+        
+        // 画面リセット時にスロット表示や装置名欄を通常状態に戻す
+        document.getElementById('slot-staff').innerHTML = '作業者: <strong id="val-staff">---</strong>';
+        document.getElementById('slot-mac').style.display = 'block';
+
         state = { tehai: '', proc: '', staff: '', mac: '', mode: '' }; 
         showScreen('screenMain'); 
     }
