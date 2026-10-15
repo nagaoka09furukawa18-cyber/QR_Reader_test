@@ -622,14 +622,18 @@
     function authAdmin() { showScreen('screenAuth'); }
     
     async function checkPassword() {
-        const passwordInput = document.getElementById('adminPwInput').value;
-        if (!passwordInput) {
+        const passwordInput = document.getElementById('adminPwInput');
+        const pwValue = passwordInput ? passwordInput.value : "";
+        
+        // 入力値が空、または取得できない場合
+        if (!pwValue) {
             alert("パスワードが違います");
             return;
         }
 
         const res = await callGas(GAS_URL + "?action=getAdminPassword");
-        if (passwordInput === String(res.password).trim()) {
+        
+        if (res && pwValue === String(res.password).trim()) {
             showScreen('screenConfig');
             const cur = (masters.device?.config || "").split(',');
             const list = document.getElementById('configList'); 
