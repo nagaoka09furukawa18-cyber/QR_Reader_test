@@ -91,7 +91,7 @@
     const GAS_URL = "https://script.google.com/macros/s/AKfycbwUe_IeJYIBaAfJqa2-KNepwKESmkV--q_ana70xwh_big9OU3PAtkBj1R2dZymkI2E/exec";
 
     let state = { tehai: '', proc: '', staff: '', mac: '', mode: '' };
-    let masters = { processes: [], staffs: [], machines: [], htList: [], device: null };
+    let masters = { processes: [], staffs: [], machines: [], htList: [], weCutList: [], weWireList: [], device: null };
     let deviceId = localStorage.getItem('test_deviceId') || 'TEST-ID-' + Math.random().toString(36).substring(2, 8).toUpperCase();
     localStorage.setItem('test_deviceId', deviceId);
 
@@ -312,6 +312,22 @@
             state.proc = res.process;
             state.staff = res.workData[2]; 
             state.mac = res.workData[3];
+            
+            // 終了時：工程の種類に応じてスロットのラベルを適切に切り替える
+            const pUpper = state.proc.toUpperCase();
+            if (pUpper.includes("HT")) {
+                document.getElementById('slot-staff').innerHTML = 'HT項目: <strong id="val-staff">---</strong>';
+                document.getElementById('slot-mac').style.display = 'none';
+            } else if (pUpper === "WE1" || pUpper === "WE2") {
+                document.getElementById('slot-staff').innerHTML = 'カット回数: <strong id="val-staff">---</strong>';
+                document.getElementById('slot-mac').innerHTML = '線径: <strong id="val-mac">---</strong>';
+                document.getElementById('slot-mac').style.display = 'block';
+            } else {
+                document.getElementById('slot-staff').innerHTML = '作業者: <strong id="val-staff">---</strong>';
+                document.getElementById('slot-mac').innerHTML = '装置名: <strong id="val-mac">---</strong>';
+                document.getElementById('slot-mac').style.display = 'block';
+            }
+
             refreshSlots();
             renderFinalConfirm("完了報告を送信しますか？");
         } else if (res.success && res.mode === "START") {
@@ -329,8 +345,8 @@
         state.staff = ''; 
         state.mac = '';
         
-        // スロット表示を通常状態にリセット
         document.getElementById('slot-staff').innerHTML = '作業者: <strong id="val-staff">---</strong>';
+        document.getElementById('slot-mac').innerHTML = '装置名: <strong id="val-mac">---</strong>';
         document.getElementById('slot-mac').style.display = 'block';
         refreshSlots('proc');
 
@@ -347,8 +363,11 @@
         state.proc = p; 
         refreshSlots('proc'); 
         
-        if (p.toUpperCase().includes("HT")) {
+        const pUpper = p.toUpperCase();
+        if (pUpper.includes("HT")) {
             renderStartHtUI();
+        } else if (pUpper === "WE1" || pUpper === "WE2") {
+            renderStartWeCutUI();
         } else {
             renderStartStaffUI(); 
         }
@@ -387,8 +406,66 @@
         });
     }
 
+    function renderStartWeCutUI() {
+        document.getElementById('slot-staff').innerHTML = 'カット回数: <strong id="val-staff">---</strong>';
+        document.getElementById('slot-mac').innerHTML = '線径: <strong id="val-mac">---</strong>';
+        document.getElementById('slot-mac').style.display = 'block';
+
+        state.staff = '';
+        state.mac = '';
+        refreshSlots('staff');
+
+        const list = masters.weCutList || [];
+        document.getElementById('button-area').innerHTML = "";
+        document.getElementById('button-title').innerText = "カット回数選択";
+
+        if (list.length === 0) {
+            document.getElementById('button-area').innerHTML = "<p style='color:red;'>M_WEシート（A列:カット回数）にデータがありません</p>";
+            return;
+        }
+
+        list.forEach(cutVal => {
+            const b = document.createElement('button');
+            b.className = "btn-blue";
+            b.innerText = cutVal;
+            b.onclick = () => {
+                state.staff = cutVal; 
+                refreshSlots('staff');
+                renderStartWeWireUI();
+            };
+            document.getElementById('button-area').appendChild(b);
+        });
+    }
+
+    function renderStartWeWireUI() {
+        refreshSlots('mac');
+        const list = masters.weWireList || [];
+        document.getElementById('button-area').innerHTML = "";
+        document.getElementById('button-title').innerText = "線径選択";
+
+        if (list.length === 0) {
+            document.getElementById('button-area').innerHTML = "<p style='color:red;'>M_WEシート（B列:線径）にデータがありません</p>";
+            return;
+        }
+
+        list.forEach(wireVal => {
+            const b = document.createElement('button');
+            b.className = "btn-green";
+            b.innerText = wireVal;
+            b.onclick = () => {
+                state.mac = wireVal; 
+                refreshSlots('mac');
+
+                AppLogger.end("STEP5", "工程を選択開始し、カット回数と線径が選択された時間");
+                renderFinalConfirm("開始準備完了");
+            };
+            document.getElementById('button-area').appendChild(b);
+        });
+    }
+
     function renderStartStaffUI() {
         document.getElementById('slot-staff').innerHTML = '作業者: <strong id="val-staff">---</strong>';
+        document.getElementById('slot-mac').innerHTML = '装置名: <strong id="val-mac">---</strong>';
         document.getElementById('slot-mac').style.display = 'block';
 
         state.staff = '';
@@ -438,7 +515,6 @@
         document.getElementById('button-area').appendChild(b);
     }
 
-    // 選択からやり直し（手配Noは保持したまま工程選択へ戻る）
     function restartSelection() {
         state.mode = "START";
         renderStartProcUI();
@@ -505,6 +581,7 @@
         } catch(e) {}
         
         document.getElementById('slot-staff').innerHTML = '作業者: <strong id="val-staff">---</strong>';
+        document.getElementById('slot-mac').innerHTML = '装置名: <strong id="val-mac">---</strong>';
         document.getElementById('slot-mac').style.display = 'block';
 
         state = { tehai: '', proc: '', staff: '', mac: '', mode: '' }; 
