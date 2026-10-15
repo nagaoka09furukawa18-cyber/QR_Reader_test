@@ -382,7 +382,7 @@
         if (pUpper.includes("HT")) {
             renderStartHtUI();
         } else {
-            renderStartStaffUI(); 
+            renderStartStaffUI(); // WE1, WE2も含めてまずは作業者選択へ進む
         }
     }
 
@@ -464,7 +464,7 @@
             
             const pUpper = state.proc.toUpperCase();
             if (pUpper === "WE1" || pUpper === "WE2") {
-                renderStartWeCutUI(); // WE1/WE2の場合は続いてカット回数選択へ
+                renderStartWeCutUI(); // 装置選択完了後にWE専用の「カット回数選択」へ進む
             } else {
                 AppLogger.end("STEP5", "工程を選択開始し、作業者、装置名が選択された時間");
                 renderFinalConfirm("開始準備完了"); 
@@ -483,7 +483,7 @@
         document.getElementById('button-title').innerText = "カット回数選択";
 
         if (list.length === 0) {
-            document.getElementById('button-area').innerHTML = "<p style='color:red;'>M_WEシート（A列）にデータがありません</p>";
+            document.getElementById('button-area').innerHTML = "<p style='color:red;'>M_WE（A列）にデータがありません</p>";
             return;
         }
 
@@ -494,7 +494,7 @@
             b.onclick = () => {
                 state.cut = cutVal; 
                 refreshSlots('cut');
-                renderStartWeWireUI();
+                renderStartWeWireUI(); // カット回数選択後に「線径選択」へ進む
             };
             document.getElementById('button-area').appendChild(b);
         });
@@ -511,7 +511,7 @@
         document.getElementById('button-title').innerText = "線径選択";
 
         if (list.length === 0) {
-            document.getElementById('button-area').innerHTML = "<p style='color:red;'>M_WEシート（B列）にデータがありません</p>";
+            document.getElementById('button-area').innerHTML = "<p style='color:red;'>M_WE（B列）にデータがありません</p>";
             return;
         }
 
