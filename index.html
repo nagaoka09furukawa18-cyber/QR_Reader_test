@@ -224,6 +224,8 @@
         document.getElementById('loading-overlay').style.display = 'flex';
         
         masters = await callGas(GAS_URL + "?action=getAllMasters&deviceId=" + deviceId);
+        console.log("取得したマスター(weCutList):", masters.weCutList);
+        alert("カット回数データ数: " + (masters.weCutList ? masters.weCutList.length : 0));
         
         if (masters.device && masters.device.config) { 
             const primaryProcess = masters.device.config.split(',')[0].trim();
