@@ -94,6 +94,9 @@
     const GAS_URL = "https://script.google.com/macros/s/AKfycbwUe_IeJYIBaAfJqa2-KNepwKESmkV--q_ana70xwh_big9OU3PAtkBj1R2dZymkI2E/exec";
 
     let state = { tehai: '', proc: '', staff: '', mac: '', cut: '', wire: '', mode: '' };
+    let selectedCuts = []; // WE1/WE2用：選択されたカット数（配列管理）
+    let targetCutCount = 0; // ユーザーが選択したカット数（0:なし, 1:1カット, 2:2カット, 3:3カット）
+
     let masters = { processes: [], staffs: [], machines: [], htList: [], weCutList: [], weWireList: [], device: null };
     let deviceId = localStorage.getItem('test_deviceId') || 'TEST-ID-' + Math.random().toString(36).substring(2, 8).toUpperCase();
     localStorage.setItem('test_deviceId', deviceId);
@@ -224,8 +227,6 @@
         document.getElementById('loading-overlay').style.display = 'flex';
         
         masters = await callGas(GAS_URL + "?action=getAllMasters&deviceId=" + deviceId);
-        console.log("取得したマスター(weCutList):", masters.weCutList);
-        alert("カット回数データ数: " + (masters.weCutList ? masters.weCutList.length : 0));
         
         if (masters.device && masters.device.config) { 
             const primaryProcess = masters.device.config.split(',')[0].trim();
@@ -279,6 +280,8 @@
 
     async function onScanSuccess(no) {
         state = { tehai: String(no).trim(), proc: '', staff: '', mac: '', cut: '', wire: '', mode: '' };
+        selectedCuts = [];
+        targetCutCount = 0;
         
         AppLogger.end("STEP3", "スキャン開始できるようになって実際にスキャンできるまで");
         AppLogger.start("STEP4");
@@ -359,6 +362,8 @@
         state.mac = '';
         state.cut = '';
         state.wire = '';
+        selectedCuts = [];
+        targetCutCount = 0;
         
         document.getElementById('slot-staff').innerHTML = '作業者: <strong id="val-staff">---</strong>';
         document.getElementById('slot-mac').innerHTML = '装置名: <strong id="val-mac">---</strong>';
@@ -466,7 +471,7 @@
             
             const pUpper = state.proc.toUpperCase();
             if (pUpper === "WE1" || pUpper === "WE2") {
-                renderStartWeCutUI(); // 装置選択完了後にWE専用の「カット回数選択」へ進む
+                renderStartWeCutModeUI(); // 装置選択完了後、WE専用のカットモード選択（なし / 1カット / 2カット / 3カット）へ進む
             } else {
                 AppLogger.end("STEP5", "工程を選択開始し、作業者、装置名が選択された時間");
                 renderFinalConfirm("開始準備完了"); 
@@ -474,29 +479,73 @@
         }; document.getElementById('button-area').appendChild(b); });
     }
 
-    // WE1/WE2用：カット回数選択UI（M_WEのA列から動的に取得）
-    function renderStartWeCutUI() {
+    // WE1/WE2用 Step1: 「なし」「1カット」「2カット」「3カット」の選択画面
+    function renderStartWeCutModeUI() {
         document.getElementById('slot-cut').style.display = 'block';
+        selectedCuts = [];
+        targetCutCount = 0;
         state.cut = '';
         refreshSlots('cut');
 
-        const list = masters.weCutList || [];
-        document.getElementById('button-area').innerHTML = "";
-        document.getElementById('button-title').innerText = "カット回数選択";
+        const modes = [
+            { label: "なし", count: 0, color: "btn-gray" },
+            { label: "1カット", count: 1, color: "btn-blue" },
+            { label: "2カット", count: 2, color: "btn-blue" },
+            { label: "3カット", count: 3, color: "btn-blue" }
+        ];
 
-        if (list.length === 0) {
+        document.getElementById('button-area').innerHTML = "";
+        document.getElementById('button-title').innerText = "カット回数（モード選択）";
+
+        modes.forEach(m => {
+            const b = document.createElement('button');
+            b.className = m.color;
+            b.innerText = m.label;
+            b.onclick = () => {
+                targetCutCount = m.count;
+                if (targetCutCount === 0) {
+                    // 「なし」が選ばれた場合：そのままスキップして「線径選択」へ
+                    state.cut = "なし";
+                    refreshSlots('cut');
+                    renderStartWeWireUI();
+                } else {
+                    // 1〜3カットが選ばれた場合：1回目の入力へ進む
+                    renderStartWeCutMasterUI(1);
+                }
+            };
+            document.getElementById('button-area').appendChild(b);
+        });
+    }
+
+    // WE1/WE2用 Step2: 各ステップ（1回目、2回目、3回目）のマスターデータ選択画面
+    function renderStartWeCutMasterUI(stepIndex) {
+        refreshSlots('cut');
+
+        const masterList = masters.weCutList || [];
+        document.getElementById('button-area').innerHTML = "";
+        document.getElementById('button-title').innerText = `【${stepIndex}回目】カット数選択 (${stepIndex}/${targetCutCount})`;
+
+        if (masterList.length === 0) {
             document.getElementById('button-area').innerHTML = "<p style='color:red;'>M_WE（A列）にデータがありません</p>";
             return;
         }
 
-        list.forEach(cutVal => {
+        masterList.forEach(val => {
             const b = document.createElement('button');
             b.className = "btn-blue";
-            b.innerText = cutVal;
+            b.innerText = val;
             b.onclick = () => {
-                state.cut = cutVal; 
+                selectedCuts.push(val);
+                state.cut = selectedCuts.join(',');
                 refreshSlots('cut');
-                renderStartWeWireUI(); // カット回数選択後に「線径選択」へ進む
+
+                if (stepIndex < targetCutCount) {
+                    // まだ次のカット選択が残っている場合
+                    renderStartWeCutMasterUI(stepIndex + 1);
+                } else {
+                    // 指定された回数分の入力が完了したら「線径選択」へ進む
+                    renderStartWeWireUI();
+                }
             };
             document.getElementById('button-area').appendChild(b);
         });
@@ -618,6 +667,8 @@
         document.getElementById('slot-wire').style.display = 'none';
 
         state = { tehai: '', proc: '', staff: '', mac: '', cut: '', wire: '', mode: '' }; 
+        selectedCuts = [];
+        targetCutCount = 0;
         showScreen('screenMain'); 
     }
     
