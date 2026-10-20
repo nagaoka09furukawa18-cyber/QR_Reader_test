@@ -93,9 +93,9 @@
 <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbwUe_IeJYIBaAfJqa2-KNepwKESmkV--q_ana70xwh_big9OU3PAtkBj1R2dZymkI2E/exec";
 
-    let state = { tehai: '', proc: '', staff: '', mac: '', cut: '', wire: '', mode: '' };
-    let selectedCuts = []; // WE1/WE2用：選択されたカット数（配列管理）
-    let targetCutCount = 0; // ユーザーが選択したカット数（0:なし, 1:1カット, 2:2カット, 3:3カット）
+    let state = { tehai: '', proc: '', staff: '', mac: '', cut1: '', cut2: '', cut3: '', wire: '', mode: '' };
+    let selectedCuts = []; 
+    let targetCutCount = 0; 
 
     let masters = { processes: [], staffs: [], machines: [], htList: [], weCutList: [], weWireList: [], device: null };
     let deviceId = localStorage.getItem('test_deviceId') || 'TEST-ID-' + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -279,7 +279,7 @@
     }
 
     async function onScanSuccess(no) {
-        state = { tehai: String(no).trim(), proc: '', staff: '', mac: '', cut: '', wire: '', mode: '' };
+        state = { tehai: String(no).trim(), proc: '', staff: '', mac: '', cut1: '', cut2: '', cut3: '', wire: '', mode: '' };
         selectedCuts = [];
         targetCutCount = 0;
         
@@ -320,8 +320,10 @@
             state.proc = res.process;
             state.staff = res.workData[2] || ''; 
             state.mac = res.workData[3] || '';
-            state.cut = res.workData[8] || '';
-            state.wire = res.workData[9] || '';
+            state.cut1 = res.workData[8] || '';
+            state.cut2 = res.workData[9] || '';
+            state.cut3 = res.workData[10] || '';
+            state.wire = res.workData[11] || '';
             
             // 終了時：工程の種類に応じてスロットの表示状態を切り替える
             const pUpper = state.proc.toUpperCase();
@@ -360,7 +362,9 @@
         state.proc = ''; 
         state.staff = ''; 
         state.mac = '';
-        state.cut = '';
+        state.cut1 = '';
+        state.cut2 = '';
+        state.cut3 = '';
         state.wire = '';
         selectedCuts = [];
         targetCutCount = 0;
@@ -401,7 +405,9 @@
 
         state.staff = '';
         state.mac = '';
-        state.cut = '';
+        state.cut1 = '';
+        state.cut2 = '';
+        state.cut3 = '';
         state.wire = '';
         refreshSlots('staff');
 
@@ -439,7 +445,9 @@
 
         state.staff = '';
         state.mac = '';
-        state.cut = '';
+        state.cut1 = '';
+        state.cut2 = '';
+        state.cut3 = '';
         state.wire = '';
         refreshSlots('staff');
 
@@ -484,7 +492,9 @@
         document.getElementById('slot-cut').style.display = 'block';
         selectedCuts = [];
         targetCutCount = 0;
-        state.cut = '';
+        state.cut1 = '';
+        state.cut2 = '';
+        state.cut3 = '';
         refreshSlots('cut');
 
         const modes = [
@@ -504,8 +514,10 @@
             b.onclick = () => {
                 targetCutCount = m.count;
                 if (targetCutCount === 0) {
-                    // 「なし」が選ばれた場合：そのままスキップして「線径選択」へ
-                    state.cut = "なし";
+                    // 「なし」が選ばれた場合：カット回数を「なし」として、即座に「線径選択」へスキップ
+                    state.cut1 = "なし";
+                    state.cut2 = "";
+                    state.cut3 = "";
                     refreshSlots('cut');
                     renderStartWeWireUI();
                 } else {
@@ -536,7 +548,9 @@
             b.innerText = val;
             b.onclick = () => {
                 selectedCuts.push(val);
-                state.cut = selectedCuts.join(',');
+                state.cut1 = selectedCuts[0] || '';
+                state.cut2 = selectedCuts[1] || '';
+                state.cut3 = selectedCuts[2] || '';
                 refreshSlots('cut');
 
                 if (stepIndex < targetCutCount) {
@@ -609,7 +623,9 @@
                     `&process=${encodeURIComponent(state.proc)}` +
                     `&staff=${encodeURIComponent(state.staff)}` +
                     `&machine=${encodeURIComponent(state.mac)}` +
-                    `&cut=${encodeURIComponent(state.cut)}` +
+                    `&cut1=${encodeURIComponent(state.cut1)}` +
+                    `&cut2=${encodeURIComponent(state.cut2)}` +
+                    `&cut3=${encodeURIComponent(state.cut3)}` +
                     `&wire=${encodeURIComponent(state.wire)}` +
                     `&deviceName=${encodeURIComponent(devName)}` +
                     `&type=${state.mode === 'END' ? 'end' : 'start'}` +
@@ -623,7 +639,7 @@
 
         if (res.success) {
             if (state.mode === 'START') {
-                const newRow = [state.tehai, state.proc, state.staff, state.mac, new Date().toISOString(), "", devName, deviceId, state.cut, state.wire];
+                const newRow = [state.tehai, state.proc, state.staff, state.mac, new Date().toISOString(), "", devName, deviceId, state.cut1, state.cut2, state.cut3, state.wire];
                 virtualDB.items.set(state.tehai, newRow);
             } else if (state.mode === 'END') {
                 virtualDB.items.delete(state.tehai);
@@ -641,12 +657,18 @@
     }
 
     function refreshSlots(k) { 
-        ['proc', 'staff', 'mac', 'cut', 'wire'].forEach(id => { 
-            const el = document.getElementById('val-'+id);
-            if (el) el.innerText = state[id] || "---"; 
+        const displayCut = [state.cut1, state.cut2, state.cut3].filter(Boolean).join(', ') || "---";
+        document.getElementById('val-proc').innerText = state.proc || "---";
+        document.getElementById('val-staff').innerText = state.staff || "---";
+        document.getElementById('val-mac').innerText = state.mac || "---";
+        document.getElementById('val-cut').innerText = displayCut;
+        document.getElementById('val-wire').innerText = state.wire || "---";
+
+        ['proc', 'staff', 'mac', 'cut', 'wire'].forEach(id => {
             const slotEl = document.getElementById('slot-'+id);
             if (slotEl) {
-                slotEl.className = 'select-slot ' + (id === k ? 'active-slot' : (!state[id] ? 'disabled' : '')); 
+                const isSet = (id === 'cut') ? (state.cut1 || state.cut2 || state.cut3) : state[id];
+                slotEl.className = 'select-slot ' + (id === k ? 'active-slot' : (!isSet ? 'disabled' : '')); 
             }
         }); 
     }
@@ -666,7 +688,7 @@
         document.getElementById('slot-cut').style.display = 'none';
         document.getElementById('slot-wire').style.display = 'none';
 
-        state = { tehai: '', proc: '', staff: '', mac: '', cut: '', wire: '', mode: '' }; 
+        state = { tehai: '', proc: '', staff: '', mac: '', cut1: '', cut2: '', cut3: '', wire: '', mode: '' }; 
         selectedCuts = [];
         targetCutCount = 0;
         showScreen('screenMain'); 
@@ -678,7 +700,6 @@
         const passwordInput = document.getElementById('adminPwInput');
         const pwValue = passwordInput ? passwordInput.value : "";
         
-        // 入力値が空、または取得できない場合
         if (!pwValue) {
             alert("パスワードが違います");
             return;
