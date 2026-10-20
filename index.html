@@ -149,16 +149,20 @@
             delete this.startTimes[stepKey];
         },
 
-        async flush() {
-            if (this.logs.length === 0) return;
-            try {
-                const dataToSend = JSON.stringify(this.logs);
-                this.logs = [];
-                await fetch(`${GAS_URL}?action=savePerformanceLog&logs=${encodeURIComponent(dataToSend)}`);
-            } catch(e) {
-                console.error("ログ送信失敗", e);
-            }
+        async function flush() {
+        // 【一時停止中：復活時はこのコメントを外して元のコードを有効化してください】
+        this.logs = []; 
+        /*
+        if (this.logs.length === 0) return;
+        try {
+            const dataToSend = JSON.stringify(this.logs);
+            this.logs = [];
+            await fetch(`${GAS_URL}?action=savePerformanceLog&logs=${encodeURIComponent(dataToSend)}`);
+        } catch(e) {
+            console.error("ログ送信失敗", e);
         }
+        */
+    }
     };
 
     async function callGas(url) {
