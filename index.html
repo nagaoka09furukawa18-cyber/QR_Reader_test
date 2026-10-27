@@ -34,18 +34,23 @@
 
         /* カメラ映像のCSSズーム・拡大用スタイル */
         #reader {
-            overflow: hidden;
-            position: relative;
-            border-radius: 8px;
-            background: #000;
+            overflow: hidden !important;
+            position: relative !important;
+            border-radius: 8px !important;
+            background: #000 !important;
             width: 100% !important;
-            aspect-ratio: 1 / 1 !important; /* 最初から最後まで綺麗な正方形をキープ */
+            aspect-ratio: 1 / 1 !important; /* 常に正方形を死守 */
         }
 
         /* 【追加】html5-qrcode のスキャン枠周りのスリム化 */
         #reader__scan_region { background: transparent !important; }
         #reader img[alt="Info icon"] { display: none; }
+
+        /* 動画要素が勝手に縦長に変形するのを強制ブロックし、正方形にクロップする */
         #reader video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important; 
             transform: scale(var(--zoom-scale, 2.0));
             transform-origin: center center;
             transition: transform 0.2s ease-out;
