@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ｆｆ<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -270,37 +270,34 @@
             };
 
             // スキャン開始
-            // 【修正】スキャン枠を180x180に絞り込み、外乱（周囲の文字など）を排除
             const config = { 
                 fps: 15, 
                 qrbox: { width: 180, height: 180 } 
             };
             
-            // 【修正】余計なキーを取り除き、安全な形式に変更
-            const constraints = { 
-                facingMode: "environment",
-                width: { ideal: 1920 },
-                height: { ideal: 1080 }
-            };
+            // 【修正】html5-qrcodeがエラーを出さないよう、初期は背面指定のみにする
+            const constraints = { facingMode: "environment" };
 
             html5QrCode.start(constraints, config, successCallback)
                 .then(() => {
                     AppLogger.end("STEP2", "QRスキャン開始ボタンを押してスキャン開始できるまで");
                     AppLogger.start("STEP3");
 
-                    // 【修正】iOS(Safari)環境向け：起動後に常時オートフォーカス制約を明示的に再適用
+                    // 【修正】起動成功直後に、解像度（フルHD）と常時オートフォーカスを安全に適用する
                     setTimeout(async () => {
                         try {
                             if (html5QrCode && html5QrCode.isScanning) {
                                 await html5QrCode.applyVideoConstraints({
+                                    width: { ideal: 1920 },
+                                    height: { ideal: 1080 },
                                     focusMode: "continuous",
                                     advanced: [{ focusMode: "continuous" }]
                                 });
                             }
                         } catch (e) {
-                            console.log("フォーカス制約の再適用スキップ:", e);
+                            console.log("制約の再適用スキップ:", e);
                         }
-                    }, 1000);
+                    }, 800);
                 })
                 .catch(err => {
                     alert("カメラの起動に失敗しました: " + err);
