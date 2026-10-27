@@ -276,13 +276,11 @@
                 qrbox: { width: 180, height: 180 } 
             };
             
-            // 【修正】フルHD解像度、高フレームレート、常時オートフォーカス制約を指定
+            // 【修正】余計なキーを取り除き、安全な形式に変更
             const constraints = { 
                 facingMode: "environment",
                 width: { ideal: 1920 },
-                height: { ideal: 1080 },
-                focusMode: "continuous",
-                advanced: [{ focusMode: "continuous" }]
+                height: { ideal: 1080 }
             };
 
             html5QrCode.start(constraints, config, successCallback)
