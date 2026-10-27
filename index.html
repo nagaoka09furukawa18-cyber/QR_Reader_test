@@ -33,11 +33,13 @@
         .test-badge { background: #ff9800; color: white; font-size: 12px; padding: 3px 8px; border-radius: 4px; display: inline-block; margin-bottom: 10px; }
 
         /* カメラ映像のCSSズーム・拡大用スタイル */
-        /* カメラ映像のCSSズーム・拡大用スタイル */
         #reader {
             overflow: hidden;
             position: relative;
             border-radius: 8px;
+            background: #000;
+            width: 100% !important;
+            aspect-ratio: 1 / 1 !important; /* 最初から最後まで綺麗な正方形をキープ */
         }
 
         /* 【追加】html5-qrcode のスキャン枠周りのスリム化 */
