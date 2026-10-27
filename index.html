@@ -32,28 +32,28 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .test-badge { background: #ff9800; color: white; font-size: 12px; padding: 3px 8px; border-radius: 4px; display: inline-block; margin-bottom: 10px; }
 
-        /* カメラ映像のCSSズーム・拡大用スタイル */
+        /* カメラ映像のCSSズーム・拡大用スタイル（親で正方形にマスクする） */
         #reader {
             overflow: hidden !important;
             position: relative !important;
             border-radius: 8px !important;
             background: #000 !important;
             width: 100% !important;
-            aspect-ratio: 1 / 1 !important; /* 常に正方形を死守 */
+            aspect-ratio: 1 / 1 !important; /* 見た目を正方形に固定 */
         }
 
-        /* 【追加】html5-qrcode のスキャン枠周りのスリム化 */
         #reader__scan_region { background: transparent !important; }
         #reader img[alt="Info icon"] { display: none; }
 
-        /* 動画要素が勝手に縦長に変形するのを強制ブロックし、正方形にクロップする */
+        /* ビデオ自体はライブラリ標準の挙動に戻し、ズームと中央配置だけを維持する */
         #reader video {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: cover !important; 
-            transform: scale(var(--zoom-scale, 2.0));
-            transform-origin: center center;
+            position: absolute !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) scale(var(--zoom-scale, 2.0)) !important;
+            transform-origin: center center !important;
             transition: transform 0.2s ease-out;
+            /* width や height の強制上書きを外し、ライブラリに任せる */
         }
     </style>
 </head>
