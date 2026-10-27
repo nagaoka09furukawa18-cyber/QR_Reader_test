@@ -32,28 +32,33 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .test-badge { background: #ff9800; color: white; font-size: 12px; padding: 3px 8px; border-radius: 4px; display: inline-block; margin-bottom: 10px; }
 
-        /* カメラ映像のCSSズーム・拡大用スタイル（親で正方形にマスクする） */
+        /* 【修正】外側のコンテナを完全に正方形の窓（フレーム）にする */
         #reader {
             overflow: hidden !important;
             position: relative !important;
-            border-radius: 8px !important;
+            border-radius: 12px !important;
             background: #000 !important;
             width: 100% !important;
-            aspect-ratio: 1 / 1 !important; /* 見た目を正方形に固定 */
+            aspect-ratio: 1 / 1 !important; /* 見た目を強制的に正方形にする */
         }
 
-        #reader__scan_region { background: transparent !important; }
-        #reader img[alt="Info icon"] { display: none; }
-
-        /* ビデオ自体はライブラリ標準の挙動に戻し、ズームと中央配置だけを維持する */
+        /* html5-qrcode が内部で生成する要素が正方形の窓からはみ出たときに綺麗に切り抜かれるようにする */
         #reader video {
             position: absolute !important;
             top: 50% !important;
             left: 50% !important;
             transform: translate(-50%, -50%) scale(var(--zoom-scale, 2.0)) !important;
             transform-origin: center center !important;
-            transition: transform 0.2s ease-out;
-            /* width や height の強制上書きを外し、ライブラリに任せる */
+            /* width や height はいじらず、ライブラリの計算値を活かしてセンター配置＋ズームのみ行う */
+        }
+
+        #reader__scan_region { background: transparent !important; }
+        #reader img[alt="Info icon"] { display: none; }
+        
+        /* ライブラリ独自の余計なプレビュー領域の崩れを防止 */
+        #reader__dashboard {
+            padding: 5px !important;
+            background: rgba(0,0,0,0.05) !important;
         }
     </style>
 </head>
