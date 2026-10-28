@@ -264,23 +264,19 @@
                 }
             };
 
+            // 【修正】qrboxをオブジェクトではなく「数値」で指定し、フリーズを防ぐと同時に枠を小さくして精度を上げる
             const config = { 
-                fps: 10, 
-                qrbox: 250 
+                fps: 5, 
+                qrbox: 200 
             };
 
-            // 【重要】起動の最初から高解像度と連続オートフォーカスをMediaStreamの制約として直接指定する
             const constraints = { 
-                facingMode: "environment",
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                focusMode: "continuous",
-                advanced: [{ focusMode: "continuous" }]
+                facingMode: "environment" 
             };
 
             html5QrCode.start(constraints, config, successCallback)
                 .then(() => {
-                    console.log("高精度モードでスキャン正常開始");
+                    console.log("スキャン正常開始");
                 })
                 .catch(err => {
                     alert("カメラの起動に失敗しました: " + err);
