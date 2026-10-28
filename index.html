@@ -264,20 +264,18 @@
                 }
             };
 
-            // 【精度向上】qrboxを小さくして（180×180）、中央の狭い範囲だけを高精度に二値化・スキャンさせる
+            // 【修正】qrboxをオブジェクトではなく「数値」で指定し、フリーズを防ぐと同時に枠を小さくして精度を上げる
             const config = { 
                 fps: 15, 
-                qrbox: { width: 180, height: 180 } 
+                qrbox: 180 
             };
 
-            // 【安定性重視】余計な後付け処理をせず、初期の安定した構成で背面カメラを起動する
             const constraints = { 
                 facingMode: "environment" 
             };
 
             html5QrCode.start(constraints, config, successCallback)
                 .then(() => {
-                    // 起動成功！余計な干渉をしないため、ここでの applyVideoConstraints は廃止します
                     console.log("スキャン正常開始");
                 })
                 .catch(err => {
