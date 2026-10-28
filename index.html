@@ -314,39 +314,51 @@
             };
 
             // スキャン開始
-            const config = { 
-                fps: 15, 
-                qrbox: { width: 180, height: 180 } 
-            };
-            
-            // 【修正】html5-qrcodeがエラーを出さないよう、初期は背面指定のみにする
-            const constraints = { facingMode: "environment" };
+        const config = { 
+            fps: 15, 
+            qrbox: { width: 180, height: 180 } 
+        };
+        
+        // html5-qrcodeがエラーを出さないよう、初期は背面指定のみにする
+        const constraints = { facingMode: "environment" };
 
-            html5QrCode.start(constraints, config, successCallback)
-                .then(() => {
-                    AppLogger.end("STEP2", "QRスキャン開始ボタンを押してスキャン開始できるまで");
-                    AppLogger.start("STEP3");
+        html5QrCode.start(constraints, config, successCallback)
+            .then(() => {
+                AppLogger.end("STEP2", "QRスキャン開始ボタンを押してスキャン開始できるまで");
+                AppLogger.start("STEP3");
 
-                    // 【修正】起動成功直後に、解像度（フルHD）と常時オートフォーカスを安全に適用する
-                    setTimeout(async () => {
-                        try {
-                            if (html5QrCode && html5QrCode.isScanning) {
-                                await html5QrCode.applyVideoConstraints({
-                                    width: { ideal: 1920 },
-                                    height: { ideal: 1080 },
-                                    focusMode: "continuous",
-                                    advanced: [{ focusMode: "continuous" }]
-                                });
-                            }
-                        } catch (e) {
-                            console.log("制約の再適用スキップ:", e);
+                // 【対策】起動した瞬間に、ライブラリが勝手に書き換えるスタイルを強制的に上書きして正方形に固定
+                const videoEl = document.querySelector("#reader video");
+                if (videoEl) {
+                    videoEl.style.cssText = "position: absolute !important; top: 50% !important; left: 50% !important; width: 100% !important; height: 100% !important; object-fit: cover !important; transform: translate(-50%, -50%) scale(var(--zoom-scale, 2.0)) !important; transform-origin: center center !important;";
+                }
+
+                // 起動成功直後に、解像度（フルHD）と常時オートフォーカスを安全に適用する
+                setTimeout(async () => {
+                    try {
+                        if (html5QrCode && html5QrCode.isScanning) {
+                            await html5QrCode.applyVideoConstraints({
+                                width: { ideal: 1920 },
+                                height: { ideal: 1080 },
+                                focusMode: "continuous",
+                                advanced: [{ focusMode: "continuous" }]
+                            });
                         }
-                    }, 800);
-                })
-                .catch(err => {
-                    alert("カメラの起動に失敗しました: " + err);
-                    resetToMain();
-                });
+                    } catch (e) {
+                        console.log("制約の再適用スキップ:", e);
+                    }
+
+                    // 【念のため再適用】制約適用後にもしスタイルがリセットされていたら再度強制上書き
+                    const videoEl2 = document.querySelector("#reader video");
+                    if (videoEl2) {
+                        videoEl2.style.cssText = "position: absolute !important; top: 50% !important; left: 50% !important; width: 100% !important; height: 100% !important; object-fit: cover !important; transform: translate(-50%, -50%) scale(var(--zoom-scale, 2.0)) !important; transform-origin: center center !important;";
+                    }
+                }, 800);
+            })
+            .catch(err => {
+                alert("カメラの起動に失敗しました: " + err);
+                resetToMain();
+            });
         } catch (err) {
             alert("カメラの起動に失敗しました: " + err);
             resetToMain();
