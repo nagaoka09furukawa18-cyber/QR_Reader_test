@@ -35,7 +35,7 @@
     /* ==========================================
        【追加・修正】完全な正方形の窓（マスク）構造
        ========================================== */
-    /* 外側の枠を完全に正方形の窓にする */
+   /* 外側の枠：純粋な正方形の窓（余計な flex は外し、確実なマスクにする） */
     .scanner-container {
         width: 100%;
         max-width: 400px;
@@ -45,11 +45,9 @@
         border-radius: 12px !important;
         background: #000 !important;
         margin: 0 auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
     }
 
+    /* #reader はコンテナのサイズに完全に追従させる */
     #reader {
         width: 100% !important;
         height: 100% !important;
@@ -65,7 +63,7 @@
         display: none !important;
     }
 
-    /* 【重要】ビデオを正方形コンテナに対して完全に中央配置し、アスペクト比を崩さずカバーする */
+    /* 【重要】ビデオを正方形コンテナのど真ん中を起点に配置し、中央から綺麗に切り抜く */
     #reader video {
         position: absolute !important;
         top: 50% !important;
@@ -78,24 +76,19 @@
         transition: transform 0.2s ease-out;
     }
 
-    #reader__scan_region { background: transparent !important; }
-    #reader img[alt="Info icon"] { display: none !important; }
-
-    /* 【重要】ビデオを正方形コンテナに対して完全に中央配置し、アスペクト比を崩さずカバーする */
-    #reader video {
+    /* スキャン領域および不要なアイコンの調整（重複を削除し一本化） */
+    #reader__scan_region { 
+        background: transparent !important; 
         position: absolute !important;
-        top: 50% !important;
-        left: 50% !important;
+        top: 0 !important;
+        left: 0 !important;
         width: 100% !important;
         height: 100% !important;
-        object-fit: cover !important; /* 縦長映像を正方形の窓に合わせて中央から綺麗に切り抜く */
-        transform: translate(-50%, -50%) scale(var(--zoom-scale, 2.0)) !important;
-        transform-origin: center center !important;
-        transition: transform 0.2s ease-out;
     }
-
-    #reader__scan_region { background: transparent !important; }
-    #reader img[alt="Info icon"] { display: none !important; }
+    
+    #reader img[alt="Info icon"] { 
+        display: none !important; 
+    }
 </style>
 </head>
 <body>
