@@ -80,6 +80,22 @@
 
     #reader__scan_region { background: transparent !important; }
     #reader img[alt="Info icon"] { display: none !important; }
+
+    /* 【重要】ビデオを正方形コンテナに対して完全に中央配置し、アスペクト比を崩さずカバーする */
+    #reader video {
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important; /* 縦長映像を正方形の窓に合わせて中央から綺麗に切り抜く */
+        transform: translate(-50%, -50%) scale(var(--zoom-scale, 2.0)) !important;
+        transform-origin: center center !important;
+        transition: transform 0.2s ease-out;
+    }
+
+    #reader__scan_region { background: transparent !important; }
+    #reader img[alt="Info icon"] { display: none !important; }
 </style>
 </head>
 <body>
