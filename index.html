@@ -246,8 +246,8 @@
         AppLogger.end("STEP1", "アプリ立ち上げから操作可能になるまで");
     }
 
+    // スキャン開始
     function startScan() {
-        AppLogger.start("STEP2");
         showScreen('screenScanner');
         changeZoom(savedZoomLevel);
 
@@ -264,13 +264,34 @@
                 }
             };
 
-            const config = { fps: 10, qrbox: 250 };
-            const constraints = { facingMode: "environment" };
+            // 【精度向上】qrboxを小さくして（例: 180×180）、中央の狭い範囲だけを高精度に二値化・スキャンさせる
+            const config = { 
+                fps: 15, 
+                qrbox: { width: 180, height: 180 } 
+            };
+
+            // 【フォーカス設定】初期起動時から背面カメラを指定
+            const constraints = { 
+                facingMode: "environment" 
+            };
 
             html5QrCode.start(constraints, config, successCallback)
                 .then(() => {
-                    AppLogger.end("STEP2", "QRスキャン開始ボタンを押してスキャン開始できるまで");
-                    AppLogger.start("STEP3");
+                    // 【初期フォーカス・解像度の適用】起動成功直後に、オートフォーカスと高解像度を安全に適用
+                    setTimeout(async () => {
+                        try {
+                            if (html5QrCode && html5QrCode.isScanning) {
+                                await html5QrCode.applyVideoConstraints({
+                                    width: { ideal: 1920 },
+                                    height: { ideal: 1080 },
+                                    focusMode: "continuous",
+                                    advanced: [{ focusMode: "continuous" }]
+                                });
+                            }
+                        } catch (e) {
+                            console.log("フォーカス設定の適用スキップ:", e);
+                        }
+                    }, 500);
                 })
                 .catch(err => {
                     alert("カメラの起動に失敗しました: " + err);
@@ -280,6 +301,7 @@
             alert("カメラの起動に失敗しました: " + err);
             resetToMain();
         }
+    }
     }
 
     async function onScanSuccess(no) {
