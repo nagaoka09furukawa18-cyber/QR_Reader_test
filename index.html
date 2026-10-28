@@ -35,24 +35,29 @@
     /* ==========================================
        【追加・修正】完全な正方形の窓（マスク）構造
        ========================================== */
+    /* 外側の枠を完全に正方形の窓にする */
     .scanner-container {
         width: 100%;
         max-width: 400px;
-        aspect-ratio: 1 / 1 !important; /* 見た目を完全に正方形にする */
+        aspect-ratio: 1 / 1 !important;
         overflow: hidden !important;
         position: relative !important;
         border-radius: 12px !important;
         background: #000 !important;
         margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     #reader {
         width: 100% !important;
         height: 100% !important;
         position: relative !important;
+        overflow: hidden !important;
     }
 
-    /* html5-qrcode が自動生成する邪魔なファイル選択やボタン（ダッシュボード）を完全に消してはみ出しを防ぐ */
+    /* html5-qrcode が自動生成する邪魔なダッシュボードを非表示にする */
     #reader__dashboard {
         display: none !important;
     }
@@ -60,11 +65,14 @@
         display: none !important;
     }
 
-    /* 映像のズーム倍率とセンター配置設定 */
+    /* 【重要】ビデオを正方形コンテナに対して完全に中央配置し、アスペクト比を崩さずカバーする */
     #reader video {
         position: absolute !important;
         top: 50% !important;
         left: 50% !important;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important; /* 縦長映像を正方形の窓に合わせて中央から綺麗に切り抜く */
         transform: translate(-50%, -50%) scale(var(--zoom-scale, 2.0)) !important;
         transform-origin: center center !important;
         transition: transform 0.2s ease-out;
